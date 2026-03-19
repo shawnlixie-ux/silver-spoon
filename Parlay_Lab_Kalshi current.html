@@ -431,6 +431,10 @@ body{font-family:var(--f);background:var(--bg);color:var(--t)}
 let D = { date:"", games:[], teams:{}, players:[], injuries:{} };
 let tracked = [];
 const AVG_ORTG = 113.5, AVG_DRTG = 112.5, AVG_PACE = 99.2;
+function logoAbbr(abbr) {
+  const m = {'NOP':'no','UTA':'utah','GSW':'gs','NYK':'ny','SAS':'sa','WAS':'wsh'};
+  return (m[abbr] || abbr).toLowerCase();
+}
 const BRIDGE = 'http://127.0.0.1:5001';
 let bridgeOK = false;
 let selectedTicker = null;
@@ -1203,7 +1207,12 @@ function renderKalshi() {
     return `<div class="cd" id="kg-${g.id}" style="margin-bottom:8px;border-radius:10px;overflow:hidden">
       <div class="flex-b" style="padding:12px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03)" onclick="toggleKalshiGame('${g.id}')">
         <div class="flex gap6 wrap" style="align-items:center">
-          <span class="fs12 fw8">${g.a} <span class="cd3" style="font-weight:400">@</span> ${g.h}</span>
+          <span class="fs14 fw8">
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.a)}.png" style="width:22px;height:22px;border-radius:4px;vertical-align:middle;margin-right:4px" onerror="this.style.display='none'">
+            ${g.a} <span class="cd3" style="font-weight:400">@</span>
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.h)}.png" style="width:22px;height:22px;border-radius:4px;vertical-align:middle;margin:0 4px" onerror="this.style.display='none'">
+            ${g.h}
+          </span>
           ${confTag(d.conf)}
           <span class="fs8 cd3">${d.votes}/3 models</span>
         </div>
@@ -1370,7 +1379,12 @@ function renderProps() {
       html += `<div class="cd" style="margin-bottom:8px;border-radius:10px;overflow:hidden">
         <div class="flex-b" style="padding:12px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03)" onclick="togglePropGroup('${key}')">
           <div class="flex gap8" style="align-items:center">
-            <span class="fs10 fw8">${g.a} @ ${g.h}</span>
+            <span class="fs13 fw8">
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${g.a.toLowerCase()}.png" style="width:18px;height:18px;border-radius:3px;vertical-align:middle;margin-right:3px" onerror="this.style.display='none'">
+            ${g.a} @
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${g.h.toLowerCase()}.png" style="width:18px;height:18px;border-radius:3px;vertical-align:middle;margin:0 3px" onerror="this.style.display='none'">
+            ${g.h}
+          </span>
             <span class="fs8 cd3">${g.t||''} ET</span>
             ${strongCount > 0 ? `<span class="tg" style="background:var(--gb);color:var(--g)">${strongCount} STRONG</span>` : ''}
           </div>
@@ -1398,10 +1412,12 @@ function renderProps() {
           <div>
             <div class="flex gap4 wrap" style="align-items:center">
               <span class="fs13 fw8">${p.name}</span>
+              <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(p.team)}.png" style="width:18px;height:18px;border-radius:3px;vertical-align:middle" onerror="this.style.display='none'">
               <span class="tg" style="background:rgba(255,255,255,0.05);color:var(--d1)">${p.team}</span>
               <span class="tg" style="background:rgba(255,255,255,0.04);color:var(--d3)">${p.pos||''}</span>
-              ${str==='STRONG'?`<span class="tg" style="background:${over?'var(--gb)':'var(--rb)'};color:${over?'var(--g)':'var(--r)'}">${over?'🔥 OVER':'❄️ UNDER'}</span>`:''}
-              ${str==='LEAN'?`<span class="tg" style="background:rgba(255,255,255,0.05);color:var(--d2)">${over?'↑ LEAN OVER':'↓ LEAN UNDER'}</span>`:''}
+              ${str==='STRONG'?`<span class="tg" style="background:${over?'var(--gb)':'var(--rb)'};color:${over?'var(--g)':'var(--r)'};box-shadow:0 0 8px ${over?'rgba(78,237,181,0.3)':'rgba(255,138,138,0.3)'};font-weight:800">${over?'🔥 STRONG OVER':'❄️ STRONG UNDER'} ${Math.abs((diff/line)*100).toFixed(0)}%</span>`:''}
+              ${str==='LEAN'?`<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">${over?'↑ LEAN OVER':'↓ LEAN UNDER'} ${Math.abs((diff/line)*100).toFixed(0)}%</span>`:''}
+              ${str==='NEUTRAL'?`<span class="tg" style="background:rgba(255,255,255,0.03);color:var(--d4)">NEUTRAL</span>`:''}
               ${p.status==='GTD'?'<span class="tg" style="background:var(--yb);color:var(--y)">GTD</span>':''}
               ${p.status==='OUT'?'<span class="tg" style="background:var(--rb);color:var(--r)">OUT</span>':''}
               ${hasKalshi?'<span class="tg" style="background:var(--kb);color:var(--k)">KALSHI</span>':''}
@@ -1423,7 +1439,7 @@ function renderProps() {
           <div><div class="st-l">${over?'OVER':'UNDR'}</div><div class="fs12 fw8" style="color:${over?'var(--g)':'var(--r)'}">${diff>0?'+':''}${diff.toFixed(1)}</div></div>
         </div>
         <div class="flex gap6" style="align-items:center">
-          <div style="flex:1"><div class="fs8 ck ls1 mb6">KALSHI LINE</div><input type="number" class="inp inp-sm inp-k tc" placeholder="${line}" value="${p._line!=null?p._line:(p._kalshiLine||'')}" oninput="updLine('${p.name}',this.value)"></div>
+          <div style="flex:1"><div class="fs8 ck ls1 mb6">KALSHI LINE</div><input type="number" class="inp inp-sm inp-k tc" placeholder="${line}" value="${p._line!=null?p._line:(p._kalshiLine||'')}" onchange="updLine('${p.name}',this.value)"></div>
           <div style="flex:1;background:${over?'var(--gb)':'var(--rb)'};border:1px solid ${over?'rgba(78,237,181,0.2)':'rgba(255,138,138,0.2)'};border-radius:6px;padding:8px;text-align:center">
             <div class="fs8 cd3">${over?'OVER':'UNDER'}</div>
             <div class="fs14 fw8" style="color:${over?'var(--g)':'var(--r)'}">${diff>0?'+':''}${diff.toFixed(1)}</div>
@@ -1450,7 +1466,7 @@ function toggleKalshiGame(id) {
   setTimeout(() => onKInput(id), 50);
 }
 
-function updLine(name, val) { const p=tracked.find(x=>x.name===name); if(p){ p._line=parseFloat(val)||0; } }
+function updLine(name, val) { const p=tracked.find(x=>x.name===name); if(p){ p._line=parseFloat(val)||0; renderProps(); } }
 
 function goTradeFromProp(ticker) {
   // Jump to trade tab and pre-select this market
