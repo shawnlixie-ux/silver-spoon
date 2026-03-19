@@ -1207,7 +1207,7 @@ function renderKalshi() {
     return `<div class="cd" id="kg-${g.id}" style="margin-bottom:8px;border-radius:10px;overflow:hidden">
       <div class="flex-b" style="padding:12px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03)" onclick="toggleKalshiGame('${g.id}')">
         <div class="flex gap6 wrap" style="align-items:center">
-          <span class="fs14 fw8">
+          <span class="fs15 fw8">
             <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.a)}.png" style="width:22px;height:22px;border-radius:4px;vertical-align:middle;margin-right:4px" onerror="this.style.display='none'">
             ${g.a} <span class="cd3" style="font-weight:400">@</span>
             <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.h)}.png" style="width:22px;height:22px;border-radius:4px;vertical-align:middle;margin:0 4px" onerror="this.style.display='none'">
@@ -1411,7 +1411,7 @@ function renderProps() {
         <div class="flex-b mb6">
           <div>
             <div class="flex gap4 wrap" style="align-items:center">
-              <span class="fs13 fw8">${p.name}</span>
+              <span class="fs14 fw8">${p.name}</span>
               <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(p.team)}.png" style="width:18px;height:18px;border-radius:3px;vertical-align:middle" onerror="this.style.display='none'">
               <span class="tg" style="background:rgba(255,255,255,0.05);color:var(--d1)">${p.team}</span>
               <span class="tg" style="background:rgba(255,255,255,0.04);color:var(--d3)">${p.pos||''}</span>
