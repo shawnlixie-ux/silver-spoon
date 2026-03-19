@@ -43,6 +43,7 @@ with open(os.path.join(RW_KEY_DIR, "orbitingrectangle12_converted.txt"), "r") as
 rw_client = KalshiClient(rw_config)
 
 ODDS_API_KEY = '4e95ed44b922d40231f0bf295268a7de'
+BALLDONTLIE_API_KEY = 'c1462bb4-5409-4ce9-bf02-4c345f5e3a6a'
 
 ODDS_TEAM_MAP = {
     'Atlanta Hawks': 'ATL', 'Boston Celtics': 'BOS', 'Brooklyn Nets': 'BKN',
@@ -335,10 +336,13 @@ def fetch_espn():
                 # Parse record
                 items = rec_data.get('items', [])
                 overall = next((i for i in items if i.get('name') == 'overall'), {})
-                home_rec = next((i for i in items if i.get('name') == 'home'), {})
-                away_rec = next((i for i in items if i.get('name') == 'road'), {})
+                home_rec = next((i for i in items if i.get('name', '').lower() == 'home'), {})
+                away_rec = next((i for i in items if i.get('name', '').lower() == 'road'), {})
                 def rec_stat(item, name):
                     return next((s['value'] for s in item.get('stats', []) if s['name'] == name), 0) or 0
+                
+                # Debug: check what stat names are available in home_rec
+                home_stat_names = [s['name'] for s in home_rec.get('stats', [])]
                 summary = overall.get('summary', '0-0')
                 w, l = (int(x) for x in summary.split('-')) if '-' in summary else (0, 0)
 
@@ -535,8 +539,8 @@ def fetch_espn_deep():
                 # ── Parse record ──
                 items = rec_data.get('items', [])
                 overall = next((i for i in items if i.get('name') == 'overall'), {})
-                home_rec = next((i for i in items if i.get('name') == 'home'), {})
-                away_rec = next((i for i in items if i.get('name') == 'road'), {})
+                home_rec = next((i for i in items if i.get('name', '').lower() == 'home'), {})
+                away_rec = next((i for i in items if i.get('name', '').lower() == 'road'), {})
                 def rec_stat(item, name):
                     return next((s['value'] for s in item.get('stats', []) if s['name'] == name), 0) or 0
                 summary = overall.get('summary', '0-0')
@@ -884,6 +888,56 @@ def get_odds():
             'injuries': injuries,
             'requests_remaining': r.headers.get('x-requests-remaining', '?')
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@app.route('/injuries', methods=['GET'])
+def get_injuries():
+    import requests as req
+    try:
+        injuries_out = {}
+        cursor = None
+        
+        while True:
+            params = {'per_page': 100}
+            if cursor:
+                params['cursor'] = cursor
+            
+            r = req.get(
+                'https://api.balldontlie.io/v1/player_injuries',
+                headers={'Authorization': BALLDONTLIE_API_KEY},
+                params=params,
+                timeout=8
+            )
+            data = r.json()
+            
+            for item in data.get('data', []):
+                player = item.get('player', {})
+                team = player.get('team', {})
+                abbr = team.get('abbreviation', '') if isinstance(team, dict) else ''
+                name = f"{player.get('first_name','')} {player.get('last_name','')}".strip()
+                status = item.get('status', 'Out')
+                
+                if not abbr or not name:
+                    continue
+                    
+                if abbr not in injuries_out:
+                    injuries_out[abbr] = []
+                
+                injuries_out[abbr].append({
+                    'p': name,
+                    's': status.upper(),
+                    'starter': True
+                })
+            
+            # Check for next page
+            meta = data.get('meta', {})
+            next_cursor = meta.get('next_cursor')
+            if not next_cursor:
+                break
+            cursor = next_cursor
+        
+        return jsonify({'injuries': injuries_out})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
