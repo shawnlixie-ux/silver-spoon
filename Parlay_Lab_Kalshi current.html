@@ -393,7 +393,9 @@ body{font-family:var(--f);background:var(--bg);color:var(--t)}
           No data loaded yet.
         </div>
       </div>
-
+      <div class="flex gap8 mb10">
+        <button class="btn btn-full" onclick="fetchVegas()" id="vegas-btn" style="border-color:rgba(255,200,50,0.4);background:rgba(255,200,50,0.08);color:var(--y)">🎰 FETCH VEGAS ODDS</button>
+      </div>  
       <div class="cd mt8">
         <div class="fs9 cd3 ls2 mb6">📐 JSON FORMAT</div>
         <div class="fs9 cd3" style="line-height:1.8">
@@ -430,6 +432,7 @@ body{font-family:var(--f);background:var(--bg);color:var(--t)}
 // ═══════════════════════════════════════════════════════
 let D = { date:"", games:[], teams:{}, players:[], injuries:{} };
 let tracked = [];
+let vegasOdds = {}; // keyed by "HOME_ABBR" → {hProb, aProb, hOdds, aOdds}
 const AVG_ORTG = 113.5, AVG_DRTG = 112.5, AVG_PACE = 99.2;
 function logoAbbr(abbr) {
   const m = {'NOP':'no','UTA':'utah','GSW':'gs','NYK':'ny','SAS':'sa','WAS':'wsh'};
@@ -457,6 +460,30 @@ async function autoFetch() {
     btn.disabled = false;
   }
 }
+
+async function fetchVegas() {
+  const btn = el('vegas-btn');
+  btn.textContent = '⏳ FETCHING...';
+  btn.disabled = true;
+  try {
+    const d = await bridgeGet('/odds');
+    vegasOdds = {};
+    d.games.forEach(g => {
+      if (g.hAbbr) vegasOdds[g.hAbbr] = {
+        hProb: g.home_prob, aProb: g.away_prob,
+        hOdds: g.home_odds, aOdds: g.away_odds,
+        aAbbr: g.aAbbr
+      };
+    });
+    btn.textContent = `✅ VEGAS LOADED (${d.requests_remaining} req left)`;
+    setTimeout(() => { btn.textContent = '🎰 FETCH VEGAS ODDS'; btn.disabled = false; }, 4000);
+    renderKalshi();
+  } catch(e) {
+    btn.textContent = '❌ ERROR';
+    btn.disabled = false;
+  }
+}
+
 function setFetchDate(offset) {
   fetchDateOffset = offset;
   const d = new Date();
@@ -927,12 +954,24 @@ function modelA(h, a, g) {
   const hInj = D.injuries[h] || [], aInj = D.injuries[a] || [];
   function injPoints(list) {
     let v = 0;
-    list.forEach(p => { if (p.s !== 'OUT') return; if (p.star) v += 0.035; else if (p.starter !== false) v += 0.015; else v += 0.005; });
+    list.forEach(inj => {
+      if (inj.s !== 'OUT') return;
+      // Look up player's actual scoring avg from players data
+      const player = D.players.find(p => p.name === inj.p);
+      const ppg = player?.szn || 0;
+      if (ppg >= 25 || inj.star) v += 0.035;
+      else if (ppg >= 18) v += 0.025;
+      else if (ppg >= 12) v += 0.015;
+      else if (ppg >= 6) v += 0.008;
+      else v += 0.003;
+    });
     return v;
   }
   const hInjV = injPoints(hInj), aInjV = injPoints(aInj);
   const injAdj = aInjV - hInjV;
-  log.push({lbl:'Injuries (tiered)', val:`${h}: -${(hInjV*100).toFixed(1)}% (${hInj.filter(x=>x.s==='OUT').length} OUT) | ${a}: -${(aInjV*100).toFixed(1)}% (${aInj.filter(x=>x.s==='OUT').length} OUT) → net ${(injAdj*100).toFixed(1)}%`});
+  const hInjOut = hInj.filter(x=>x.s==='OUT').map(x => { const pl = D.players.find(p=>p.name===x.p); return `${x.p}${pl?.szn?` (${pl.szn}ppg)`:''}`;}).join(', ');
+  const aInjOut = aInj.filter(x=>x.s==='OUT').map(x => { const pl = D.players.find(p=>p.name===x.p); return `${x.p}${pl?.szn?` (${pl.szn}ppg)`:''}`;}).join(', ');
+  log.push({lbl:'Injuries (PPG-tiered)', val:`${h}: -${(hInjV*100).toFixed(1)}% [${hInjOut||'none'}] | ${a}: -${(aInjV*100).toFixed(1)}% [${aInjOut||'none'}] → net ${(injAdj*100).toFixed(1)}%`});
 
   let restAdj = 0;
   const hRest = g?.hRest ?? 1, aRest = g?.aRest ?? 1;
@@ -1283,13 +1322,20 @@ function onKInput(gid) {
           <div class="fs14 fw8" style="color:${edge>0?'var(--g)':'var(--r)'}">${edge>0?'+':''}${edge.toFixed(1)}%</div>
         </div>
       </div>
-      <div class="g5 mt8" style="background:var(--bg);border-radius:8px;padding:10px">
-        <div><div class="st-l ck">KALSHI</div><div class="fs14 fw8">${s.kp}%</div></div>
-        <div><div class="st-l cp">MOD A</div><div class="fs14 fw8" style="color:${s.mA*100>s.kp?'var(--g)':'var(--r)'}">${(s.mA*100).toFixed(0)}%</div></div>
-        <div><div class="st-l cy">MOD B</div><div class="fs14 fw8" style="color:${s.mB*100>s.kp?'var(--g)':'var(--r)'}">${(s.mB*100).toFixed(0)}%</div></div>
-        <div><div class="st-l cb">MOD C</div><div class="fs14 fw8" style="color:${s.mC*100>s.kp?'var(--g)':'var(--r)'}">${(s.mC*100).toFixed(0)}%</div></div>
-        <div><div class="st-l" style="color:var(--k)">AVG</div><div class="fs14 fw8 ck">${(s.mp*100).toFixed(0)}%</div></div>
-      </div>
+      ${(() => {
+          const vo = vegasOdds[s.tm];
+          const vProb = vo ? (s.tm === g.h ? vo.hProb : vo.aProb) : null;
+          const vOdds = vo ? (s.tm === g.h ? vo.hOdds : vo.aOdds) : null;
+          const cols = vProb ? 'g5' : 'g5';
+          return `<div style="display:grid;grid-template-columns:repeat(${vProb?6:5},1fr);gap:4px;background:var(--bg);border-radius:8px;padding:10px;margin-top:8px">
+            <div><div class="st-l ck">KALSHI</div><div class="fs14 fw8">${s.kp?s.kp+'%':'—'}</div></div>
+            <div><div class="st-l cp">MOD A</div><div class="fs14 fw8" style="color:${s.mA*100>s.kp?'var(--g)':'var(--r)'}">${(s.mA*100).toFixed(0)}%</div></div>
+            <div><div class="st-l cy">MOD B</div><div class="fs14 fw8" style="color:${s.mB*100>s.kp?'var(--g)':'var(--r)'}">${(s.mB*100).toFixed(0)}%</div></div>
+            <div><div class="st-l cb">MOD C</div><div class="fs14 fw8" style="color:${s.mC*100>s.kp?'var(--g)':'var(--r)'}">${(s.mC*100).toFixed(0)}%</div></div>
+            <div><div class="st-l" style="color:var(--k)">AVG</div><div class="fs14 fw8 ck">${(s.mp*100).toFixed(0)}%</div></div>
+            ${vProb ? `<div><div class="st-l" style="color:var(--y)">VEGAS</div><div class="fs14 fw8" style="color:var(--y)">${vProb}%</div><div class="fs8 cd4">${vOdds>0?'+':''}${vOdds}</div></div>` : ''}
+          </div>`;
+        })()}
       ${k.bet > 0 ? `<div class="kelly-box"><div class="flex-b"><span class="fs8 ck ls1">📐 KELLY</span><span class="fs14 fw8 ck">$${k.bet.toFixed(2)}</span></div><div class="fs8 cd3 mt6">${k.pct.toFixed(1)}% of bankroll · Edge: +${k.edge.toFixed(1)}% · Conf: ${d.conf}</div></div>` : ''}
     </div>`;
   });

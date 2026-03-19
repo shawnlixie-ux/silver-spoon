@@ -25,6 +25,8 @@ from kalshi_python_sync import Configuration, KalshiClient
 app = Flask(__name__)
 CORS(app)
 
+
+
 # ─── AUTHENTICATION ───────────────────────────────────
 config = Configuration(host="https://api.elections.kalshi.com/trade-api/v2")
 config.api_key_id = "5a3ad6f1-a741-42a3-8ce6-20ce32529d7a"
@@ -39,6 +41,21 @@ rw_config.api_key_id = "e98fa333-9d9c-4402-a345-545ec5736023"
 with open(os.path.join(RW_KEY_DIR, "orbitingrectangle12_converted.txt"), "r") as f:
     rw_config.private_key_pem = f.read()
 rw_client = KalshiClient(rw_config)
+
+ODDS_API_KEY = '4e95ed44b922d40231f0bf295268a7de'
+
+ODDS_TEAM_MAP = {
+    'Atlanta Hawks': 'ATL', 'Boston Celtics': 'BOS', 'Brooklyn Nets': 'BKN',
+    'Charlotte Hornets': 'CHA', 'Chicago Bulls': 'CHI', 'Cleveland Cavaliers': 'CLE',
+    'Dallas Mavericks': 'DAL', 'Denver Nuggets': 'DEN', 'Detroit Pistons': 'DET',
+    'Golden State Warriors': 'GSW', 'Houston Rockets': 'HOU', 'Indiana Pacers': 'IND',
+    'Los Angeles Clippers': 'LAC', 'Los Angeles Lakers': 'LAL', 'Memphis Grizzlies': 'MEM',
+    'Miami Heat': 'MIA', 'Milwaukee Bucks': 'MIL', 'Minnesota Timberwolves': 'MIN',
+    'New Orleans Pelicans': 'NOP', 'New York Knicks': 'NYK', 'Oklahoma City Thunder': 'OKC',
+    'Orlando Magic': 'ORL', 'Philadelphia 76ers': 'PHI', 'Phoenix Suns': 'PHX',
+    'Portland Trail Blazers': 'POR', 'Sacramento Kings': 'SAC', 'San Antonio Spurs': 'SAS',
+    'Toronto Raptors': 'TOR', 'Utah Jazz': 'UTA', 'Washington Wizards': 'WAS'
+}
 
 @app.route('/status', methods=['GET'])
 def status():
@@ -798,6 +815,77 @@ def fetch_espn_deep():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/odds', methods=['GET'])
+def get_odds():
+    import requests as req
+    try:
+        # Fetch NBA odds + injury data
+        r = req.get(
+            'https://api.the-odds-api.com/v4/sports/basketball_nba/odds',
+            params={
+                'apiKey': ODDS_API_KEY,
+                'regions': 'us',
+                'markets': 'h2h',
+                'oddsFormat': 'american',
+                'dateFormat': 'iso'
+            },
+            timeout=8
+        )
+        data = r.json()
+        
+        games = []
+        for game in data:
+            home = game.get('home_team', '')
+            away = game.get('away_team', '')
+            commence = game.get('commence_time', '')
+            
+            # Extract best available odds
+            home_odds, away_odds = None, None
+            for bookie in game.get('bookmakers', []):
+                for market in bookie.get('markets', []):
+                    if market.get('key') == 'h2h':
+                        for outcome in market.get('outcomes', []):
+                            if outcome['name'] == home and home_odds is None:
+                                home_odds = outcome.get('price')
+                            elif outcome['name'] == away and away_odds is None:
+                                away_odds = outcome.get('price')
+                if home_odds and away_odds:
+                    break
+
+            def to_prob(odds):
+                if odds is None: return None
+                if odds < 0: return round(abs(odds) / (abs(odds) + 100) * 100, 1)
+                return round(100 / (odds + 100) * 100, 1)
+
+            games.append({
+                'home': home,
+                'away': away,
+                'hAbbr': ODDS_TEAM_MAP.get(home, ''),
+                'aAbbr': ODDS_TEAM_MAP.get(away, ''),
+                'commence': game.get('commence_time', ''),
+                'home_odds': home_odds,
+                'away_odds': away_odds,
+                'home_prob': to_prob(home_odds),
+                'away_prob': to_prob(away_odds)
+            })
+
+        # Fetch injuries
+        inj_r = req.get(
+            'https://api.the-odds-api.com/v4/sports/basketball_nba/participants',
+            params={'apiKey': ODDS_API_KEY},
+            timeout=8
+        )
+        inj_data = inj_r.json() if inj_r.status_code == 200 else []
+        injuries = inj_data if isinstance(inj_data, list) else []
+
+        return jsonify({
+            'games': games,
+            'injuries': injuries,
+            'requests_remaining': r.headers.get('x-requests-remaining', '?')
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print("═══════════════════════════════════════════════")
