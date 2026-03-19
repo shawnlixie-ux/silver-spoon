@@ -372,6 +372,29 @@ body{font-family:var(--f);background:var(--bg);color:var(--t)}
       <div id="data-log" class="mt10"></div>
 <!-- Date selector -->
       <div class="mb10 mt8">
+        <!-- Manual Injury Input -->
+<div class="mb12">
+  <div class="fs8 cd3 ls1 mb6">MANUAL INJURY OVERRIDE</div>
+  <div class="flex gap6 mb6">
+    <input type="text" id="inj-name" class="inp" placeholder="Player name..." style="flex:2" oninput="injSearch(this.value)">
+    <select id="inj-status" class="inp" style="flex:1">
+      <option value="OUT">OUT</option>
+      <option value="GTD">GTD</option>
+      <option value="PLAY">PLAY</option>
+    </select>
+  </div>
+  <div id="inj-search-results" class="sr-wrap" style="display:none;margin-bottom:6px"></div>
+  <div class="flex gap6 mb6">
+    <label class="flex gap4" style="align-items:center;cursor:pointer;font-size:11px;color:var(--d2)">
+      <input type="checkbox" id="inj-star"> ⭐ Star
+    </label>
+    <label class="flex gap4" style="align-items:center;cursor:pointer;font-size:11px;color:var(--d2)">
+      <input type="checkbox" id="inj-starter" checked> Starter
+    </label>
+  </div>
+  <button class="btn btn-k btn-full mb6" onclick="addManualInjury()">+ ADD INJURY</button>
+  <div id="manual-injuries-list" style="max-height:120px;overflow-y:auto"></div>
+</div>
         <div class="fs8 cd3 ls1 mb6">SELECT DATE</div>
         <div class="flex gap6 wrap" id="date-btns">
           <button class="btn btn-k" onclick="setFetchDate(0)" id="date-btn-0">📅 TODAY</button>
@@ -1018,9 +1041,9 @@ function modelB(h, a, g) {
   // L10 record — now real data from ESPN schedule
   const hL10wp = (hT.l10w||5) / ((hT.l10w||5) + (hT.l10l||5));
   const aL10wp = (aT.l10w||5) / ((aT.l10w||5) + (aT.l10l||5));
-  const l10Edge = (hL10wp - aL10wp) * 0.50;
-  log.push({lbl:'L10 record', val:`${h}: ${hT.l10w||'?'}-${hT.l10l||'?'} (${(hL10wp*100).toFixed(0)}%) | ${a}: ${aT.l10w||'?'}-${aT.l10l||'?'} (${(aL10wp*100).toFixed(0)}%) → ${(l10Edge*100).toFixed(1)}%`});
-
+  const l10Edge = (hL10wp - aL10wp) * 0.65;
+  log.push({lbl:'L10 record', val:`${h}: ${hT.l10w!=null?hT.l10w:'?'}-${hT.l10l!=null?hT.l10l:'?'} (${(hL10wp*100).toFixed(0)}%) | ${a}: ${aT.l10w!=null?aT.l10w:'?'}-${aT.l10l!=null?aT.l10l:'?'} (${(aL10wp*100).toFixed(0)}%) → ${(l10Edge*100).toFixed(1)}%`});
+  
   // Scoring trend — L10 pts vs season avg
   const hTrend = ((hT.l10ptsFor||hT.ptsFor||110) - (hT.ptsFor||110)) * 0.003;
   const aTrend = ((aT.l10ptsFor||aT.ptsFor||110) - (aT.ptsFor||110)) * 0.003;
@@ -1030,17 +1053,23 @@ function modelB(h, a, g) {
   // Win streak — real data
   const hStrk = hT.streak || 0, aStrk = aT.streak || 0;
   let streakAdj = 0;
-  if (hStrk >= 5) streakAdj += 0.035; else if (hStrk >= 4) streakAdj += 0.025; else if (hStrk >= 3) streakAdj += 0.015;
-  if (hStrk <= -5) streakAdj -= 0.025; else if (hStrk <= -4) streakAdj -= 0.018; else if (hStrk <= -3) streakAdj -= 0.012;
-  if (aStrk >= 5) streakAdj -= 0.035; else if (aStrk >= 4) streakAdj -= 0.025; else if (aStrk >= 3) streakAdj -= 0.015;
-  if (aStrk <= -5) streakAdj += 0.025; else if (aStrk <= -4) streakAdj += 0.018; else if (aStrk <= -3) streakAdj += 0.012;
+  if (hStrk >= 10) streakAdj += 0.06; else if (hStrk >= 7) streakAdj += 0.045; else if (hStrk >= 5) streakAdj += 0.035; else if (hStrk >= 4) streakAdj += 0.025; else if (hStrk >= 3) streakAdj += 0.015;
+  if (hStrk <= -10) streakAdj -= 0.06; else if (hStrk <= -7) streakAdj -= 0.045; else if (hStrk <= -5) streakAdj -= 0.035; else if (hStrk <= -4) streakAdj -= 0.025; else if (hStrk <= -3) streakAdj -= 0.018;
+  if (aStrk >= 10) streakAdj -= 0.06; else if (aStrk >= 7) streakAdj -= 0.045; else if (aStrk >= 5) streakAdj -= 0.035; else if (aStrk >= 4) streakAdj -= 0.025; else if (aStrk >= 3) streakAdj -= 0.015;
+  if (aStrk <= -10) streakAdj += 0.06; else if (aStrk <= -7) streakAdj += 0.045; else if (aStrk <= -5) streakAdj += 0.035; else if (aStrk <= -4) streakAdj += 0.025; else if (aStrk <= -3) streakAdj += 0.018;
   log.push({lbl:'Win streaks', val:`${h}: ${hStrk>0?'W':'L'}${Math.abs(hStrk)} | ${a}: ${aStrk>0?'W':'L'}${Math.abs(aStrk)} → ${(streakAdj*100).toFixed(1)}%`});
 
   // Venue split — home win% vs away win%
-  const hHwp = (hT.hw||20) / ((hT.hw||20) + (hT.hl||15));
-  const aAwp = (aT.aw||15) / ((aT.aw||15) + (aT.al||20));
-  const venueAdj = (hHwp - aAwp) * 0.25;
-  log.push({lbl:'Venue split', val:`${h} home: ${hT.hw||'?'}-${hT.hl||'?'} (${(hHwp*100).toFixed(0)}%) | ${a} away: ${aT.aw||'?'}-${aT.al||'?'} (${(aAwp*100).toFixed(0)}%) → ${(venueAdj*100).toFixed(1)}%`});
+  let venueAdj = 0;
+  let venueLog = 'No venue data';
+  if (hT.hw > 0 && aT.aw > 0) {
+    const hHwp = hT.hw / (hT.hw + hT.hl);
+    const aAwp = aT.aw / (aT.aw + aT.al);
+    venueAdj = (hHwp - aAwp) * 0.25;
+    venueLog = `${h} home: ${hT.hw}-${hT.hl} (${(hHwp*100).toFixed(0)}%) | ${a} away: ${aT.aw}-${aT.al} (${(aAwp*100).toFixed(0)}%) → ${(venueAdj*100).toFixed(1)}%`;
+  }
+  log.push({lbl:'Venue split', val:venueLog});
+  
 
   // Opponent-adjusted form — was the streak vs good or bad teams?
   const hOppAdj = hT.opp_adj_form || 0, aOppAdj = aT.opp_adj_form || 0;
@@ -1323,7 +1352,9 @@ function onKInput(gid) {
         </div>
       </div>
       ${(() => {
-          const vo = vegasOdds[s.tm];
+          const voHome = vegasOdds[g.h];
+          const voAway = voHome ? null : vegasOdds[g.a];
+          const vo = voHome || voAway;
           const vProb = vo ? (s.tm === g.h ? vo.hProb : vo.aProb) : null;
           const vOdds = vo ? (s.tm === g.h ? vo.hOdds : vo.aOdds) : null;
           const cols = vProb ? 'g5' : 'g5';
@@ -1571,6 +1602,85 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   checkBridge(); // Auto-check bridge on load
 });
+
+let manualInjuries = []; // [{name, team, status, star, starter}]
+
+function injSearch(q) {
+  const wrap = el('inj-search-results');
+  if (!q || q.length < 2) { wrap.style.display='none'; return; }
+  const matches = D.players.filter(p => p.name.toLowerCase().includes(q.toLowerCase())).slice(0, 5);
+  if (!matches.length) { wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  wrap.innerHTML = matches.map(p =>
+    `<div class="sr" onclick="selectInjPlayer('${p.name}','${p.team}')">${p.name} <span class="cd3">${p.team}</span></div>`
+  ).join('');
+}
+
+let selectedInjTeam = '';
+function selectInjPlayer(name, team) {
+  el('inj-name').value = name;
+  selectedInjTeam = team;
+  el('inj-search-results').style.display = 'none';
+}
+
+function addManualInjury() {
+  const name = el('inj-name').value.trim();
+  const status = el('inj-status').value;
+  const star = el('inj-star').checked;
+  const starter = el('inj-starter').checked;
+  if (!name) return;
+
+  // Find team from players data or use selectedInjTeam
+  const player = D.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+  const team = selectedInjTeam || player?.team || '';
+
+  if (!team) { alert('Player not found in loaded data — load game data first'); return; }
+
+  // Remove existing entry for this player
+  manualInjuries = manualInjuries.filter(x => x.name !== name);
+  manualInjuries.push({ name, team, status, star, starter });
+
+  // Update D.injuries
+  if (!D.injuries[team]) D.injuries[team] = [];
+  D.injuries[team] = D.injuries[team].filter(x => x.p !== name);
+  D.injuries[team].push({ p: name, s: status, star, starter });
+
+  // Also update player status in tracked
+  const tp = tracked.find(p => p.name === name);
+  if (tp) tp.status = status;
+
+  el('inj-name').value = '';
+  selectedInjTeam = '';
+  el('inj-star').checked = false;
+  el('inj-starter').checked = true;
+  renderManualInjuries();
+  renderAll();
+}
+
+function removeManualInjury(name) {
+  const inj = manualInjuries.find(x => x.name === name);
+  if (inj && D.injuries[inj.team]) {
+    D.injuries[inj.team] = D.injuries[inj.team].filter(x => x.p !== name);
+  }
+  manualInjuries = manualInjuries.filter(x => x.name !== name);
+  renderManualInjuries();
+  renderAll();
+}
+
+function renderManualInjuries() {
+  const el2 = el('manual-injuries-list');
+  if (!manualInjuries.length) { el2.innerHTML = '<div class="fs8 cd4">No manual injuries added</div>'; return; }
+  el2.innerHTML = manualInjuries.map(x =>
+    `<div class="flex-b" style="padding:4px 0;border-bottom:1px solid var(--bd)">
+      <div>
+        <span class="fs9 fw7">${x.name}</span>
+        <span class="tg" style="background:${x.status==='OUT'?'var(--rb)':x.status==='GTD'?'var(--yb)':'var(--gb)'};color:${x.status==='OUT'?'var(--r)':x.status==='GTD'?'var(--y)':'var(--g)'};margin-left:4px">${x.status}</span>
+        <span class="fs8 cd3 ml4">${x.team} · ${x.star?'⭐ Star':x.starter?'Starter':'Bench'}</span>
+      </div>
+      <button class="btn-d" onclick="removeManualInjury('${x.name}')">✕</button>
+    </div>`
+  ).join('');
+}
 </script>
 </body>
 </html>
