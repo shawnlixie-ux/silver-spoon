@@ -62,6 +62,24 @@
 - Vegas gap still exists (~10-15%) due to missing injury info and matchup-specific data we don't have
 - nba_api installed but only has scoreboard/boxscore/playbyplay/odds — no injury endpoint
 
+## Additional Goals — March 19, 2026
+
+### Immediate
+- [ ] Hot/cold streak detection — already have L5 game scores in note field, detect trend direction (3 straight up = hot, 3 straight down = cold), show badge on props card
+- [ ] Minutes trend alert — if player avg 35min season but 28min L5, flag as rotation change. Data already available.
+- [ ] 3-in-4 rest adjustment — count games in last 4 days from schedule data, apply ~5% penalty if 3+ games. More granular than just B2B.
+
+### Medium Term
+- [ ] Referee tendencies — NBA posts ref assignments 2-3 days before games. High foul-calling refs = higher scoring, more FT-dependent players boosted. Scrape NBA.com assignments.
+- [ ] Arena-specific HCA — some arenas genuinely harder (MSG, TD Garden, Kaseya). Add small static adjustments per arena beyond just Denver/Utah altitude.
+- [ ] Opponent rest tracking — we check our team's B2B but not always opponent's schedule density fully. Add opponent 3-in-4 penalty.
+- [ ] Team pace trend — some teams play measurably faster/slower as season progresses. L10 pace vs season pace diff.
+
+### Long Term / V3
+- [ ] EPM scraping — Dunks & Threes EPM is best free public player impact metric. Scrape and use for injury impact calculation and game model weighting. No API, requires scraping.
+- [ ] Player props line movement — track Kalshi line changes over time, flag significant moves as sharp money indicator.
+- [ ] Shot quality trend — true shooting % over L5 vs season. Efficient scorer on hot streak vs volume scorer.
+
 ## Architecture (Current State)
 
 ### Files
