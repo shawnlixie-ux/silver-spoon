@@ -39,6 +39,29 @@
 
 ---
 
+### Completed
+- Vegas odds via Odds API — fetch moneyline odds, convert to implied probability, show VEGAS % column on game cards
+- Team logos added to Kalshi tab game headers and Props tab player cards + game headers
+- Props confidence % — STRONG/LEAN/NEUTRAL badges now show % over/under line with glow effect on STRONG
+- Collapsible game cards on both Kalshi tab and Props tab
+- Props line input fix — onchange instead of oninput, no more focus loss on multi-digit entry
+- Manual injury input UI — autocomplete player search, OUT/GTD/PLAY status, Star/Starter tier, instant model update
+- Model B fixes — venue split now uses real home/away data (was defaulting to 57/43%), stronger streak penalties (up to ±6% for 10+ game streaks), L10 weight increased 0.50→0.65
+- Fixed home/away record parsing — ESPN uses "Home"/"Road" not "home"/"road" (case sensitive bug)
+- Props formula upgraded — L5 50%, decay-weighted L10 30%, season 20%, B2B penalty, tiered blowout, star-out boost, proportional home/away, softer oppD multiplier, minutes adjustment
+- Pace-adjusted ortg/drtg (per 100 possessions)
+- Usage rate via avgEstimatedPossessions from ESPN advanced stats
+- Exponential decay L10 weighting (decay=0.85) in bridge.py
+- Injury impact by PPG tier (25+/18-25/12-18/6-12/<6) instead of flat star/starter/bench
+- Future game date picker (Today/+1/+2/+3 days)
+- GitHub repo set up (silver-spoon)
+
+### Known Issues
+- BallDontLie injuries endpoint requires paid tier — manual input is current workaround
+- NBA.com and ESPN injury APIs unreliable/blocked
+- Vegas gap still exists (~10-15%) due to missing injury info and matchup-specific data we don't have
+- nba_api installed but only has scoreboard/boxscore/playbyplay/odds — no injury endpoint
+
 ## Architecture (Current State)
 
 ### Files
