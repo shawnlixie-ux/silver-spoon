@@ -1124,6 +1124,13 @@ function projPts(p) {
     base *= minRatio;
   }
 
+  // Usage rate adjustment — high usage players get more opportunities
+  // avgEstimatedPossessions: league avg ~20, range roughly 8-30
+  // Scale: player usage vs league avg 20, capped at ±15%
+  if (p.usg > 0) {
+    const usgRatio = Math.min(1.15, Math.max(0.85, p.usg / 20));
+    base *= usgRatio;
+  }
   // B2B penalty — players score ~11% less on back-to-backs
   const g = D.games.find(x => x.h === p.team || x.a === p.team);
   const isHome = g?.h === p.team;

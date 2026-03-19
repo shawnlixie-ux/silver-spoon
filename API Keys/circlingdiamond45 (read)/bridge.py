@@ -684,11 +684,24 @@ def fetch_espn_deep():
             if not pid:
                 return player
             try:
-                r = req.get(
-                    f'https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{pid}/gamelog',
-                    timeout=6
-                )
-                data = r.json()
+                # Fetch gamelog and advanced stats in parallel
+                with ThreadPoolExecutor(max_workers=2) as pinner:
+                    f_log = pinner.submit(req.get,
+                        f'https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{pid}/gamelog',
+                        timeout=6)
+                    f_adv = pinner.submit(req.get,
+                        f'https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/2026/types/2/athletes/{pid}/statistics',
+                        timeout=6)
+                    data = f_log.result().json()
+                    adv_data = f_adv.result().json()
+
+                # Extract usage rate from advanced stats
+                for cat in adv_data.get('splits', {}).get('categories', []):
+                    for s in cat.get('stats', []):
+                        if s.get('name') == 'avgEstimatedPossessions':
+                            val = s.get('value', 0) or 0
+                            if val > 0:
+                                player['usg'] = round(float(val), 1)
 
                 labels = data.get('labels', [])
                 pts_idx = labels.index('PTS') if 'PTS' in labels else None
