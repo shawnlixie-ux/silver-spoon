@@ -1450,7 +1450,7 @@ function toggleKalshiGame(id) {
   setTimeout(() => onKInput(id), 50);
 }
 
-function updLine(name, val) { const p=tracked.find(x=>x.name===name); if(p){p._line=parseFloat(val)||p.line; renderProps();} }
+function updLine(name, val) { const p=tracked.find(x=>x.name===name); if(p){ p._line=parseFloat(val)||0; } }
 
 function goTradeFromProp(ticker) {
   // Jump to trade tab and pre-select this market
