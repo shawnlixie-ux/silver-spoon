@@ -435,6 +435,8 @@ const BRIDGE = 'http://127.0.0.1:5001';
 let bridgeOK = false;
 let selectedTicker = null;
 let fetchDateOffset = 0; // 0 = today, 1 = tomorrow, etc.
+const propCollapsed = {}; // tracks which game groups are collapsed
+const kalshiCollapsed = {};
 let kalshiMarkets = []; // cached search results
 async function autoFetch() {
   const btn = el('auto-fetch-btn');
@@ -1197,8 +1199,9 @@ function renderKalshi() {
   el('kalshi-games').innerHTML = D.games.map(g => {
     const d = triModel(g.h, g.a, g);
     const kH = g.kH || g.hp || '', kA = g.kA || g.ap || '';
-    return `<div class="cd" id="kg-${g.id}">
-      <div class="flex-b mb8">
+    const collapsed = kalshiCollapsed[g.id] || false;
+    return `<div class="cd" id="kg-${g.id}" style="margin-bottom:8px;border-radius:10px;overflow:hidden">
+      <div class="flex-b" style="padding:12px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03)" onclick="toggleKalshiGame('${g.id}')">
         <div class="flex gap6 wrap" style="align-items:center">
           <span class="fs12 fw8">${g.a} <span class="cd3" style="font-weight:400">@</span> ${g.h}</span>
           ${confTag(d.conf)}
@@ -1206,30 +1209,35 @@ function renderKalshi() {
         </div>
         <div class="flex gap6" style="align-items:center">
           <span class="fs8 cd3">${g.t||''} ET</span>
-          <button class="btn" style="padding:4px 8px;font-size:10px" onclick="toggleMath('${g.id}')">📊 Math</button>
+          <span style="color:var(--d2);font-size:14px">${collapsed ? '▶' : '▼'}</span>
         </div>
       </div>
-      <div id="math-${g.id}" style="display:none;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:10px">
-        ${renderLog(d.logA, '⚡ MODEL A — EFFICIENCY (45%)', 'var(--p)')}
-        ${renderLog(d.logB, '📈 MODEL B — MOMENTUM (30%)', 'var(--y)')}
-        ${renderLog(d.logC, '🎯 MODEL C — MATCHUP (25%)', 'var(--b)')}
-        <div style="border-top:1px solid var(--bd);padding-top:8px;margin-top:4px">
-          <div class="fs9 fw8">WEIGHTED: A ${(d.a*100).toFixed(1)}% × 0.45 + B ${(d.b*100).toFixed(1)}% × 0.30 + C ${(d.c*100).toFixed(1)}% × 0.25 = <span class="ck">${(d.avg*100).toFixed(1)}%</span> ${g.h}</div>
+      <div id="kg-body-${g.id}" style="display:${collapsed?'none':'block'};padding:14px">
+        <div style="margin-bottom:10px">
+          <button class="btn" style="padding:4px 8px;font-size:10px" onclick="event.stopPropagation();toggleMath('${g.id}')">📊 Math</button>
         </div>
+        <div id="math-${g.id}" style="display:none;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:10px">
+          ${renderLog(d.logA, '⚡ MODEL A — EFFICIENCY (45%)', 'var(--p)')}
+          ${renderLog(d.logB, '📈 MODEL B — MOMENTUM (30%)', 'var(--y)')}
+          ${renderLog(d.logC, '🎯 MODEL C — MATCHUP (25%)', 'var(--b)')}
+          <div style="border-top:1px solid var(--bd);padding-top:8px;margin-top:4px">
+            <div class="fs9 fw8">WEIGHTED: A ${(d.a*100).toFixed(1)}% × 0.45 + B ${(d.b*100).toFixed(1)}% × 0.30 + C ${(d.c*100).toFixed(1)}% × 0.25 = <span class="ck">${(d.avg*100).toFixed(1)}%</span> ${g.h}</div>
+          </div>
+        </div>
+        <div class="g2">
+          <div>
+            <div class="fs8 cd3 mb6">${g.a} Kalshi %</div>
+            <input type="number" class="inp tc" id="ki-${g.id}-a" placeholder="—" value="${kA}" oninput="onKInput('${g.id}')">
+            <div class="fs8 cd3 mt6">Model: <span class="cp fw7">${((1-d.avg)*100).toFixed(0)}%</span></div>
+          </div>
+          <div>
+            <div class="fs8 cd3 mb6">${g.h} Kalshi % 🏠</div>
+            <input type="number" class="inp tc" id="ki-${g.id}-h" placeholder="—" value="${kH}" oninput="onKInput('${g.id}')">
+            <div class="fs8 cd3 mt6">Model: <span class="cp fw7">${(d.avg*100).toFixed(0)}%</span></div>
+          </div>
+        </div>
+        <div id="ka-${g.id}" class="mt8"></div>
       </div>
-      <div class="g2">
-        <div>
-          <div class="fs8 cd3 mb6">${g.a} Kalshi %</div>
-          <input type="number" class="inp tc" id="ki-${g.id}-a" placeholder="—" value="${kA}" oninput="onKInput('${g.id}')">
-          <div class="fs8 cd3 mt6">Model: <span class="cp fw7">${((1-d.avg)*100).toFixed(0)}%</span></div>
-        </div>
-        <div>
-          <div class="fs8 cd3 mb6">${g.h} Kalshi % 🏠</div>
-          <input type="number" class="inp tc" id="ki-${g.id}-h" placeholder="—" value="${kH}" oninput="onKInput('${g.id}')">
-          <div class="fs8 cd3 mt6">Model: <span class="cp fw7">${(d.avg*100).toFixed(0)}%</span></div>
-        </div>
-      </div>
-      <div id="ka-${g.id}" class="mt8"></div>
     </div>`;
   }).join('');
   setTimeout(() => D.games.forEach(g => onKInput(g.id)), 50);
@@ -1343,14 +1351,37 @@ function renderProps() {
   tracked.forEach(p => {
     const g = D.games.find(x => x.h===p.team||x.a===p.team||x.h===p.opp||x.a===p.opp);
     const key = g ? g.id : 'other';
-    if (!byGame[key]) byGame[key] = {game:g, players:[]};
+    if (!byGame[key]) byGame[key] = {game:g, players:[], collapsed: propCollapsed[key]||false};
     byGame[key].players.push(p);
   });
 
   let html = '';
-  Object.values(byGame).forEach(group => {
+  Object.entries(byGame).forEach(([key, group]) => {
     const g = group.game;
-    if (g) html += `<div class="flex-b mb6 mt8"><span class="fs10 fw8">${g.a} @ ${g.h}</span><span class="fs8 cd3">${g.t||''} ET</span></div>`;
+    const collapsed = propCollapsed[key] || false;
+    const count = group.players.length;
+    const strongCount = group.players.filter(p => {
+      const proj = projPts(p);
+      const line = p._kalshiLine || p._line || p.line;
+      return Math.abs(proj - line) > 3;
+    }).length;
+
+    if (g) {
+      html += `<div class="cd" style="margin-bottom:8px;border-radius:10px;overflow:hidden">
+        <div class="flex-b" style="padding:12px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03)" onclick="togglePropGroup('${key}')">
+          <div class="flex gap8" style="align-items:center">
+            <span class="fs10 fw8">${g.a} @ ${g.h}</span>
+            <span class="fs8 cd3">${g.t||''} ET</span>
+            ${strongCount > 0 ? `<span class="tg" style="background:var(--gb);color:var(--g)">${strongCount} STRONG</span>` : ''}
+          </div>
+          <div class="flex gap6" style="align-items:center">
+            <span class="fs8 cd3">${count} players</span>
+            <span style="color:var(--d2);font-size:14px">${collapsed ? '▶' : '▼'}</span>
+          </div>
+        </div>
+        <div id="prop-group-${key}" style="display:${collapsed?'none':'block'}">`;
+    }
+
     group.players.forEach(p => {
       const proj = projPts(p);
       const line = p._kalshiLine || p._line || p.line;
@@ -1370,6 +1401,7 @@ function renderProps() {
               <span class="tg" style="background:rgba(255,255,255,0.05);color:var(--d1)">${p.team}</span>
               <span class="tg" style="background:rgba(255,255,255,0.04);color:var(--d3)">${p.pos||''}</span>
               ${str==='STRONG'?`<span class="tg" style="background:${over?'var(--gb)':'var(--rb)'};color:${over?'var(--g)':'var(--r)'}">${over?'🔥 OVER':'❄️ UNDER'}</span>`:''}
+              ${str==='LEAN'?`<span class="tg" style="background:rgba(255,255,255,0.05);color:var(--d2)">${over?'↑ LEAN OVER':'↓ LEAN UNDER'}</span>`:''}
               ${p.status==='GTD'?'<span class="tg" style="background:var(--yb);color:var(--y)">GTD</span>':''}
               ${p.status==='OUT'?'<span class="tg" style="background:var(--rb);color:var(--r)">OUT</span>':''}
               ${hasKalshi?'<span class="tg" style="background:var(--kb);color:var(--k)">KALSHI</span>':''}
@@ -1401,8 +1433,21 @@ function renderProps() {
         </div>
       </div>`;
     });
+
+    if (g) html += `</div></div>`;
   });
   el('props-list').innerHTML = html;
+}
+
+function togglePropGroup(key) {
+  propCollapsed[key] = !propCollapsed[key];
+  renderProps();
+}
+
+function toggleKalshiGame(id) {
+  kalshiCollapsed[id] = !kalshiCollapsed[id];
+  renderKalshi();
+  setTimeout(() => onKInput(id), 50);
 }
 
 function updLine(name, val) { const p=tracked.find(x=>x.name===name); if(p){p._line=parseFloat(val)||p.line; renderProps();} }
