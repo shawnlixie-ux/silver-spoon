@@ -1002,7 +1002,15 @@ function modelA(h, a, g) {
   if (aRest === 0) restAdj += 0.030;
   if (hRest >= 2) restAdj += 0.008;
   if (aRest >= 2) restAdj -= 0.008;
-  log.push({lbl:'Rest/B2B', val:`${h}: ${hRest===0?'⚠️ B2B':'rest '+hRest+'d'} | ${a}: ${aRest===0?'⚠️ B2B':'rest '+aRest+'d'} → ${(restAdj*100).toFixed(1)}%`});
+
+  // 3-in-4 fatigue
+  const hG4 = hT.games_last4 || 0, aG4 = aT.games_last4 || 0;
+  if (hG4 >= 3) restAdj -= 0.020;
+  if (aG4 >= 3) restAdj += 0.020;
+
+  const h3in4 = hG4 >= 3 ? ` ⚠️ 3-in-4` : '';
+  const a3in4 = aG4 >= 3 ? ` ⚠️ 3-in-4` : '';
+  log.push({lbl:'Rest/B2B', val:`${h}: ${hRest===0?'⚠️ B2B':'rest '+hRest+'d'}${h3in4} | ${a}: ${aRest===0?'⚠️ B2B':'rest '+aRest+'d'}${a3in4} → ${(restAdj*100).toFixed(1)}%`});
 
   let travelAdj = 0;
   if (g?.aTravel) travelAdj += 0.01;
@@ -1237,6 +1245,73 @@ function projPts(p) {
   else if (starterOut === 1) base *= 1.03;
 
   return Math.round(base * 10) / 10;
+}
+
+function getStreakBadge(p) {
+  if (!p.note) return '';
+  const match = p.note.match(/L5: ([\d,]+)/);
+  if (!match) return '';
+  const games = match[1].split(',').map(Number);
+  if (games.length < 3) return '';
+  
+  // Check last 3 games trend
+  const last3 = games.slice(-3);
+  const allUp = last3[0] < last3[1] && last3[1] < last3[2];
+  const allDown = last3[0] > last3[1] && last3[1] > last3[2];
+  const bigUp = last3[2] > last3[0] * 1.3; // 30% higher than 3 games ago
+  const bigDown = last3[2] < last3[0] * 0.7; // 30% lower than 3 games ago
+
+  if (allUp && bigUp) return '<span class="tg" style="background:rgba(78,237,181,0.15);color:var(--g)">🔥 HOT</span>';
+  if (allDown && bigDown) return '<span class="tg" style="background:rgba(255,100,100,0.15);color:var(--r)">❄️ COLD</span>';
+  if (allUp) return '<span class="tg" style="background:rgba(78,237,181,0.08);color:var(--g)">↑ TRENDING</span>';
+  if (allDown) return '<span class="tg" style="background:rgba(255,100,100,0.08);color:var(--r)">↓ FADING</span>';
+  return '';
+}
+
+function getMinTrendBadge(p) {
+  if (!p.min || !p.szn) return '';
+  const minDiff = p.min - (p.szn / p.szn * p.min); // L10 avg min
+  // Compare L10 avg minutes vs what we'd expect from season role
+  // If min field (L10 avg) is significantly lower than typical starter load
+  const seasonMin = p.min; // this is already L10 avg from bridge
+  // We need to detect if recent minutes are trending down
+  // Use the note field L5 scores as proxy — if scoring down AND minutes down
+  if (!p.note) return '';
+  const match = p.note.match(/L5: ([\d,]+)/);
+  if (!match) return '';
+  const l5games = match[1].split(',').map(Number);
+  const l5avg = l5games.reduce((a,b) => a+b, 0) / l5games.length;
+  
+  // If L10 avg minutes < 28 and season avg scoring suggests they should play more
+  if (p.min < 25 && p.szn > 12) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  if (p.min > 0 && p.szn > 0) {
+    const minRatio = p.min / 32;
+    if (minRatio < 0.75 && p.szn > 15) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  }
+  return '';
+}
+
+function getMinTrendBadge(p) {
+  if (!p.min || !p.szn) return '';
+  const minDiff = p.min - (p.szn / p.szn * p.min); // L10 avg min
+  // Compare L10 avg minutes vs what we'd expect from season role
+  // If min field (L10 avg) is significantly lower than typical starter load
+  const seasonMin = p.min; // this is already L10 avg from bridge
+  // We need to detect if recent minutes are trending down
+  // Use the note field L5 scores as proxy — if scoring down AND minutes down
+  if (!p.note) return '';
+  const match = p.note.match(/L5: ([\d,]+)/);
+  if (!match) return '';
+  const l5games = match[1].split(',').map(Number);
+  const l5avg = l5games.reduce((a,b) => a+b, 0) / l5games.length;
+  
+  // If L10 avg minutes < 28 and season avg scoring suggests they should play more
+  if (p.min < 25 && p.szn > 12) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  if (p.min > 0 && p.szn > 0) {
+    const minRatio = p.min / 32;
+    if (minRatio < 0.75 && p.szn > 15) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  }
+  return '';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1499,7 +1574,7 @@ function renderProps() {
               ${p.status==='OUT'?'<span class="tg" style="background:var(--rb);color:var(--r)">OUT</span>':''}
               ${hasKalshi?'<span class="tg" style="background:var(--kb);color:var(--k)">KALSHI</span>':''}
             </div>
-            <div class="fs8 cd3 mt6">vs ${p.opp} · ${p.note||''}</div>
+            <div class="fs8 cd3 mt6">vs ${p.opp} · ${p.note||''} ${getStreakBadge(p)} ${getMinTrendBadge(p)}</div>
             ${hasKalshi ? `<div class="fs8 mt6" style="color:var(--k)">${p._kalshiTicker} · YES ${p._kalshiYes||'—'}¢ / NO ${p._kalshiNo||'—'}¢</div>` : ''}
           </div>
           <div class="tr" style="flex-shrink:0">
