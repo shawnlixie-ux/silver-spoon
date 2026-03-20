@@ -371,7 +371,7 @@ def fetch_espn():
 
                 # Parse roster — first 10 players (ESPN returns starters first)
                 athletes = roster_data.get('athletes', [])
-                for athlete in athletes[:10]:
+                for athlete in athletes[:15]:
                     status_type = athlete.get('status', {}).get('type', 'active')
                     if status_type == 'injured': inj_status = 'OUT'
                     elif status_type == 'questionable': inj_status = 'GTD'
@@ -603,7 +603,13 @@ def fetch_espn_deep():
                 # Opponent-adjusted form — average net rating of last 10 opponents
                 # We'll store opp abbreviations and look up their net ratings after
                 l10_opps = [g['opp'] for g in last10]
-
+                # 3-in-4 check — count games in last 4 days
+                from datetime import datetime, timedelta
+                now = datetime.utcnow()
+                recent_games = [g for g in completed if g['date'] and 
+                    (now - datetime.fromisoformat(g['date'].replace('Z','+00:00').replace('+00:00',''))).days <= 4]
+                games_in_last4 = len(recent_games)
+                
                 result['schedule_stats'] = {
                     'l10w': l10w, 'l10l': l10l,
                     'l10ptsFor': l10pts,
@@ -635,7 +641,7 @@ def fetch_espn_deep():
 
                 # Parse roster — first 10 players (ESPN returns starters first)
                 athletes = roster_data.get('athletes', [])
-                for athlete in athletes[:10]:
+                for athlete in athletes[:15]:
                     status_type = athlete.get('status', {}).get('type', 'active')
                     if status_type == 'injured': inj_status = 'OUT'
                     elif status_type == 'questionable': inj_status = 'GTD'
@@ -704,15 +710,16 @@ def fetch_espn_deep():
             pid = player.get('id', '')
             if not pid:
                 return player
+            ABBR_REMAP = {'GS': 'GSW', 'SA': 'SAS', 'NY': 'NYK', 'WSH': 'WAS', 'NO': 'NOP', 'UTAH': 'UTA'}
             try:
                 # Fetch gamelog and advanced stats in parallel
                 with ThreadPoolExecutor(max_workers=2) as pinner:
                     f_log = pinner.submit(req.get,
                         f'https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{pid}/gamelog',
-                        timeout=6)
+                        timeout=10)
                     f_adv = pinner.submit(req.get,
                         f'https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/seasons/2026/types/2/athletes/{pid}/statistics',
-                        timeout=6)
+                        timeout=10)
                     data = f_log.result().json()
                     adv_data = f_adv.result().json()
 
@@ -741,7 +748,13 @@ def fetch_espn_deep():
                             event_info = events_dict.get(event_id, {})
                             game_date = event_info.get('gameDate', '')
                             event_team = event_info.get('team', {}).get('abbreviation', '')
-                            if current_team and event_team and event_team != current_team:
+                            norm_event = ABBR_REMAP.get(event_team, event_team)
+                            norm_current = ABBR_REMAP.get(current_team, current_team)
+                            if current_team and event_team and norm_event != norm_current:
+                                continue
+                            norm_event = ABBR_MAP.get(event_team, event_team)
+                            norm_current = ABBR_MAP.get(current_team, current_team)
+                            if current_team and event_team and norm_event != norm_current and event_team != current_team:
                                 continue
                             pts_val = None
                             min_val = None
@@ -788,14 +801,14 @@ def fetch_espn_deep():
         active_players = [p for p in players_raw if p.get('status') != 'OUT']
         inactive_players = [p for p in players_raw if p.get('status') == 'OUT']
 
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        with ThreadPoolExecutor(max_workers=30) as executor:
             futures = [executor.submit(fetch_player_gamelog, p) for p in active_players]
             players_with_stats = [f.result() for f in futures]
 
-        # Sort by minutes descending, filter out players with no games
-        # Then take top 8 per team by minutes played
-        players_with_stats = [p for p in players_with_stats if p.get('szn', 0) > 0]
-        players_with_stats.sort(key=lambda x: x.get('min', 0), reverse=True)
+        # Sort by impact score (PPG × minutes), filter out pure DNP players
+        # Keep players with either szn stats OR minutes played
+        players_with_stats = [p for p in players_with_stats if p.get('szn', 0) > 0 or p.get('min', 0) > 10]
+        players_with_stats.sort(key=lambda x: x.get('szn', 0) * x.get('min', 0), reverse=True)
 
         # Take top 8 per team
         team_counts = {}
@@ -820,6 +833,29 @@ def fetch_espn_deep():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
+@app.route('/debug-roster/<abbr>', methods=['GET'])
+def debug_roster(abbr):
+    import requests as req
+    ESPN = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
+    ABBR_TO_ID = {
+        'GSW': '9', 'NYK': '18', 'ATL': '1', 'BOS': '2', 'BKN': '17',
+        'CHA': '30', 'CHI': '4', 'CLE': '5', 'DAL': '6', 'DEN': '7',
+        'DET': '8', 'HOU': '10', 'IND': '11', 'LAC': '12', 'LAL': '13',
+        'MEM': '29', 'MIA': '14', 'MIL': '15', 'MIN': '16', 'NOP': '3',
+        'OKC': '25', 'ORL': '19', 'PHI': '20', 'PHX': '21', 'POR': '22',
+        'SAC': '23', 'SAS': '24', 'TOR': '28', 'UTA': '26', 'WAS': '27'
+    }
+    tid = ABBR_TO_ID.get(abbr, '')
+    if not tid:
+        return jsonify({'error': 'unknown team'})
+    r = req.get(f'{ESPN}/teams/{tid}/roster', timeout=6).json()
+    athletes = r.get('athletes', [])
+    return jsonify({
+        'total': len(athletes),
+        'players': [{'id': a.get('id'), 'name': a.get('displayName'), 'status': a.get('status',{}).get('type','active')} for a in athletes[:15]]
+    })
+
+
 @app.route('/odds', methods=['GET'])
 def get_odds():
     import requests as req
