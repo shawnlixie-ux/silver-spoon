@@ -1,0 +1,3249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DELTA — NBA Edge Analysis</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --bg:#05050e;
+  --s:#0c0c1e;
+  --s2:#111126;
+  --bd:rgba(255,255,255,0.07);
+  --bh:rgba(120,130,255,0.4);
+  --p:#a5b0ff;--pb:rgba(165,176,255,0.1);
+  --g:#3dffc0;--gb:rgba(61,255,192,0.08);
+  --r:#ff6b6b;--rb:rgba(255,107,107,0.1);
+  --y:#ffc94a;--yb:rgba(255,201,74,0.08);
+  --b:#60b8ff;--bb:rgba(96,184,255,0.1);
+  --o:#ff9a5c;
+  --k:#00f5c4;--kb:rgba(0,245,196,0.07);--kbd:rgba(0,245,196,0.25);
+  --t:#e8ecf5;--d1:#9aa5bd;--d2:#6b7a96;--d3:#3d4d68;--d4:#28364f;
+  --f:'JetBrains Mono',ui-monospace,monospace;
+  --fs:'Space Grotesk',sans-serif;
+}
+
+html,body{height:100%;overflow:hidden}
+
+body{
+  font-family:var(--f);
+  background:var(--bg);
+  color:var(--t);
+}
+
+/* ── BACKGROUND CANVAS ── */
+#bg-canvas{
+  position:fixed;inset:0;z-index:0;
+  pointer-events:none;opacity:0.35;
+}
+
+/* ── APP LAYOUT — no header/tabs taking fixed space ── */
+.app{
+  display:flex;flex-direction:column;
+  height:100vh;width:100%;
+  position:relative;z-index:1;
+}
+
+/* ── FLOATING HEADER ── */
+.hdr{
+  position:fixed;top:14px;left:50%;transform:translateX(-50%);
+  z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;
+  background:rgba(8,8,22,0.75);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:16px;
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 1px rgba(0,245,196,0.05),inset 0 1px 0 rgba(255,255,255,0.05);
+  width:calc(100% - 48px);
+  max-width:1400px;
+  gap:16px;
+}
+
+.hdr::before{
+  content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,245,196,0.4),rgba(165,176,255,0.3),transparent);
+}
+
+.hdr-left{display:flex;align-items:center;gap:14px;flex-shrink:0}
+
+.delta-mark{display:flex;align-items:baseline;gap:5px}
+.delta-symbol{
+  font-family:var(--fs);font-size:26px;font-weight:700;
+  background:linear-gradient(135deg,#00f5c4 0%,#a5b0ff 60%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;
+}
+.delta-name{
+  font-size:15px;font-weight:800;letter-spacing:3.5px;
+  color:var(--t);font-family:var(--f);
+}
+.hdr-sub{
+  font-size:9px;color:var(--d3);letter-spacing:1.8px;
+  font-family:var(--f);white-space:nowrap;
+}
+
+.hdr-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+.bankroll-inline{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(0,245,196,0.04);
+  border:1px solid rgba(0,245,196,0.12);
+  border-radius:8px;padding:5px 10px;
+}
+.bankroll-inline label{font-size:9px;color:var(--d3);letter-spacing:1.8px;white-space:nowrap}
+.bankroll-inline input{
+  background:transparent;border:none;color:var(--k);
+  font-size:14px;font-weight:800;font-family:var(--f);
+  width:70px;outline:none;text-align:right;
+}
+
+.kelly-sel{
+  background:rgba(0,0,0,0.3);border:1px solid var(--bd);border-radius:7px;
+  padding:5px 9px;color:var(--p);font-size:11px;font-family:var(--f);
+  font-weight:700;outline:none;cursor:pointer;transition:border-color .15s;
+}
+.kelly-sel:hover{border-color:var(--bh)}
+
+.bridge-indicator{
+  display:flex;align-items:center;gap:4px;padding:5px 9px;border-radius:7px;
+  font-size:10px;font-weight:700;letter-spacing:0.8px;cursor:pointer;
+  border:1px solid var(--bd);background:rgba(0,0,0,0.3);transition:all .15s;
+}
+.bridge-indicator:hover{background:var(--s2);border-color:var(--bh)}
+
+/* ── FLOATING PILL TABS ── */
+.tabs{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  z-index:100;
+  display:flex;align-items:center;gap:2px;
+  background:rgba(8,8,22,0.8);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:100px;
+  padding:5px;
+  backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);
+  box-shadow:0 8px 40px rgba(0,0,0,0.5),0 0 0 1px rgba(0,245,196,0.04),inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.tab{
+  padding:8px 18px;border:none;cursor:pointer;
+  font-family:var(--f);font-size:10px;font-weight:700;letter-spacing:1.2px;
+  background:transparent;color:var(--d2);
+  border-radius:100px;transition:all .2s;
+  white-space:nowrap;position:relative;
+}
+.tab:hover{color:var(--d1);background:rgba(255,255,255,0.04)}
+
+/* Active tab — pill with glow */
+.tab.on-k{
+  background:rgba(0,245,196,0.12);
+  color:var(--k);
+  box-shadow:0 0 16px rgba(0,245,196,0.15),inset 0 1px 0 rgba(0,245,196,0.2);
+}
+.tab.on{
+  background:rgba(165,176,255,0.12);
+  color:var(--p);
+  box-shadow:0 0 16px rgba(165,176,255,0.15),inset 0 1px 0 rgba(165,176,255,0.2);
+}
+
+/* Lamp glow above active tab */
+.tab.on-k::before,.tab.on::before{
+  content:'';
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+  width:30px;height:3px;border-radius:0 0 4px 4px;
+}
+.tab.on-k::before{
+  background:var(--k);
+  box-shadow:0 0 10px var(--k),0 0 20px rgba(0,245,196,0.5);
+}
+.tab.on::before{
+  background:var(--p);
+  box-shadow:0 0 10px var(--p),0 0 20px rgba(165,176,255,0.5);
+}
+
+/* ── MAIN CONTENT — padded for floating header/tabs ── */
+.main{
+  flex:1;overflow-y:auto;
+  padding:90px 24px 90px;
+  position:relative;z-index:1;
+}
+.panel{display:none}
+.panel.on{display:block}
+
+/* ── CARDS ── */
+.cd{
+  background:rgba(10,10,24,0.85);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:14px;padding:16px;margin-bottom:10px;
+  position:relative;transition:border-color .2s, box-shadow .2s;
+  backdrop-filter:blur(8px);
+}
+.cd:hover{border-color:rgba(255,255,255,0.18);box-shadow:0 4px 24px rgba(0,0,0,0.3)}
+
+.cd-hl{
+  border-color:rgba(0,245,196,0.2);
+  background:linear-gradient(135deg,rgba(0,245,196,0.03),rgba(12,12,30,0));
+  box-shadow:0 0 20px rgba(0,245,196,0.05),inset 0 1px 0 rgba(0,245,196,0.08);
+}
+.cd-g{
+  border-color:rgba(61,255,192,0.28);
+  background:linear-gradient(135deg,rgba(61,255,192,0.07),rgba(10,10,24,0));
+}
+.cd-r{
+  border-color:rgba(255,107,107,0.28);
+  background:linear-gradient(135deg,rgba(255,107,107,0.07),rgba(10,10,24,0));
+}
+.cd-lock{
+  border-color:rgba(0,245,196,0.35) !important;
+  box-shadow:0 0 30px rgba(0,245,196,0.08),0 0 60px rgba(0,245,196,0.04),inset 0 1px 0 rgba(0,245,196,0.15) !important;
+}
+
+/* Mouse-tracking glow */
+.cd-glow{position:relative;overflow:hidden}
+/* Outer glow layer - spreads outside card */
+.cd-glow::after{
+  content:'';position:absolute;inset:-1px;border-radius:inherit;
+  background:conic-gradient(from var(--glow-angle,0deg) at var(--glow-x,50%) var(--glow-y,50%),
+    transparent 0deg,
+    rgba(0,245,196,0.6) 40deg,
+    rgba(165,176,255,0.3) 80deg,
+    transparent 120deg);
+  opacity:var(--glow-opacity,0);transition:opacity .25s;
+  z-index:0;pointer-events:none;
+  /* Mask to only show as border */
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  padding:1px;
+}
+/* Inner ambient glow */
+.cd-glow::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:radial-gradient(circle at var(--glow-x,50%) var(--glow-y,50%),
+    rgba(0,245,196,0.06) 0%, transparent 60%);
+  opacity:var(--glow-opacity,0);transition:opacity .25s;
+  z-index:0;pointer-events:none;
+}
+.cd-glow>*{position:relative;z-index:1}
+
+/* ── TAGS ── */
+.tg{font-size:10px;font-weight:700;letter-spacing:0.8px;padding:3px 8px;border-radius:6px;display:inline-block;font-family:var(--f)}
+
+/* ── INPUTS ── */
+.inp{
+  width:100%;background:rgba(0,0,0,0.35);
+  border:1px solid var(--bd);border-radius:8px;
+  padding:10px 12px;color:var(--t);font-size:15px;font-weight:700;
+  font-family:var(--f);outline:none;transition:border-color .15s, box-shadow .15s;
+}
+.inp:focus{border-color:rgba(0,245,196,0.3);box-shadow:0 0 0 3px rgba(0,245,196,0.06)}
+.inp-sm{font-size:13px;padding:8px 10px}
+.inp-k{border-color:rgba(0,245,196,0.2)}
+.inp-k:focus{border-color:var(--k)}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
+.g5{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:4px}
+
+.st-l{font-size:9px;color:var(--d3);letter-spacing:1.5px;margin-bottom:3px;text-transform:uppercase}
+.st-v{font-size:24px;font-weight:800;line-height:1}
+
+.bar{width:100%;height:4px;border-radius:4px;background:rgba(255,255,255,0.05);overflow:hidden}
+.bar-f{height:100%;border-radius:4px;transition:width .5s cubic-bezier(0.4,0,0.2,1)}
+
+.kelly-box{
+  background:linear-gradient(135deg,rgba(0,245,196,0.05),rgba(165,176,255,0.05));
+  border:1px solid rgba(0,245,196,0.15);border-radius:10px;padding:12px;margin-top:10px;
+}
+
+.search{position:relative;margin-bottom:12px}
+.search input{
+  width:100%;background:var(--s);border:1px solid rgba(0,245,196,0.15);
+  border-radius:10px;padding:11px 14px 11px 40px;
+  color:var(--t);font-size:14px;font-family:var(--f);outline:none;transition:border-color .15s;
+}
+.search input:focus{border-color:rgba(0,245,196,0.35)}
+.search::before{content:'⌕';position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--d3)}
+.sres{
+  position:absolute;top:calc(100% + 4px);left:0;right:0;
+  background:var(--s2);border:1px solid var(--bd);border-radius:10px;
+  max-height:220px;overflow-y:auto;z-index:100;display:none;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+.sres.open{display:block}
+.sr{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--bd);transition:background .1s;color:var(--d1)}
+.sr:hover{background:rgba(0,245,196,0.05);color:var(--t)}
+.sr:last-child{border-bottom:none}
+
+.btn{
+  padding:9px 16px;border-radius:8px;border:1px solid var(--bh);background:var(--pb);color:var(--p);
+  font-size:11px;font-weight:700;cursor:pointer;font-family:var(--f);letter-spacing:.5px;transition:all .15s;
+}
+.btn:hover{background:rgba(165,176,255,0.15);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-k{background:var(--kb);border-color:rgba(0,245,196,0.2);color:var(--k)}
+.btn-k:hover{background:rgba(0,245,196,0.1);border-color:var(--k);box-shadow:0 0 12px rgba(0,245,196,0.15)}
+.btn-d{background:rgba(255,107,107,0.07);border-color:rgba(255,107,107,0.2);color:var(--r);padding:6px 10px;font-size:11px}
+.btn-d:hover{background:rgba(255,107,107,0.12)}
+.btn-full{width:100%}
+
+.loader{position:relative}
+.loader textarea{
+  width:100%;height:100px;background:rgba(0,0,0,0.3);
+  border:1px solid rgba(0,245,196,0.15);border-radius:10px;padding:12px;
+  color:var(--k);font-size:11px;font-family:var(--f);resize:vertical;outline:none;
+}
+.loader textarea::placeholder{color:var(--d4)}
+.loader textarea:focus{border-color:rgba(0,245,196,0.3)}
+
+.flex{display:flex}.flex-b{display:flex;justify-content:space-between;align-items:center}
+.gap4{gap:4px}.gap6{gap:6px}.gap8{gap:8px}.gap10{gap:10px}
+.mt6{margin-top:6px}.mt8{margin-top:8px}.mt10{margin-top:10px}.mt12{margin-top:12px}
+.mb6{margin-bottom:6px}.mb8{margin-bottom:8px}.mb10{margin-bottom:10px}.mb12{margin-bottom:12px}
+.tc{text-align:center}.tr{text-align:right}
+.fw7{font-weight:700}.fw8{font-weight:800}
+.ck{color:var(--k)}.cp{color:var(--p)}.cg{color:var(--g)}.cr{color:var(--r)}.cy{color:var(--y)}.cb{color:var(--b)}
+.cd2{color:var(--d2)}.cd3{color:var(--d3)}.cd4{color:var(--d4)}
+.fs8{font-size:10px}.fs9{font-size:11px}.fs10{font-size:12px}.fs11{font-size:13px}
+.fs12{font-size:14px}.fs13{font-size:16px}.fs14{font-size:18px}
+.ls1{letter-spacing:1px}.ls2{letter-spacing:2px}
+.wrap{flex-wrap:wrap}
+.empty{text-align:center;padding:60px 24px;color:var(--d4)}
+.empty i{font-size:42px;font-style:normal;display:block;margin-bottom:12px}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--d4);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--d3)}
+
+.status-bar{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;
+  background:rgba(8,8,20,0.9);border:1px solid rgba(255,255,255,0.1);
+  border-radius:8px;font-size:11px;color:var(--d1);margin-bottom:14px;
+  backdrop-filter:blur(8px);
+}
+.dot{width:7px;height:7px;border-radius:50%}
+.dot-g{background:var(--g);box-shadow:0 0 6px var(--g)}
+.dot-r{background:var(--r);box-shadow:0 0 6px var(--r)}
+.dot-y{background:var(--y);box-shadow:0 0 6px var(--y)}
+
+.ob-row{display:grid;grid-template-columns:1fr 60px;gap:4px;padding:4px 8px;font-size:11px;border-radius:4px}
+.ob-yes{background:rgba(61,255,192,0.04)}
+.ob-no{background:rgba(255,107,107,0.04)}
+.ob-hdr{color:var(--d3);font-size:9px;letter-spacing:1.5px;font-weight:700;padding:6px 8px 2px}
+
+.mkt-card{background:rgba(0,0,0,0.2);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:8px;transition:all .15s}
+.mkt-card:hover{border-color:rgba(0,245,196,0.2);background:rgba(0,245,196,0.02)}
+.mkt-card.selected{border-color:var(--k);background:rgba(0,245,196,0.04);box-shadow:0 0 20px rgba(0,245,196,0.07)}
+
+.trade-form{background:linear-gradient(135deg,rgba(0,245,196,0.03),rgba(165,176,255,0.03));border:1px solid rgba(0,245,196,0.15);border-radius:12px;padding:16px}
+.trade-confirm{background:rgba(0,245,196,0.08);border:1px solid rgba(0,245,196,0.25);border-radius:8px;padding:12px;text-align:center;cursor:pointer;font-family:var(--f);font-weight:800;color:var(--k);font-size:14px;letter-spacing:1px;transition:all .15s}
+.trade-confirm:hover{background:rgba(0,245,196,0.14);box-shadow:0 0 20px rgba(0,245,196,0.1)}
+.trade-confirm:active{transform:scale(0.99)}
+.trade-confirm.danger{background:rgba(255,107,107,0.08);border-color:rgba(255,107,107,0.25);color:var(--r)}
+
+.pos-card{background:rgba(0,0,0,0.2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse{animation:pulse 1.5s infinite}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.panel.on{animation:fadeIn .25s ease}
+
+@keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(0,245,196,0.06)}50%{box-shadow:0 0 40px rgba(0,245,196,0.12)}}
+
+/* Smooth collapse animation */
+.collapsible-body{
+  overflow:hidden;
+  transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+  max-height:0;opacity:0;
+}
+.collapsible-body.open{
+  max-height:2000px;opacity:1;
+}
+
+/* Chevron rotation */
+.chevron{
+  display:inline-block;
+  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  font-size:12px;color:var(--d3);
+}
+.chevron.open{transform:rotate(90deg)}
+
+/* Game filter bar */
+.game-filter-bar{
+  display:flex;gap:6px;flex-wrap:wrap;
+  margin-bottom:14px;
+  padding:10px 14px;
+  background:rgba(0,0,0,0.25);
+  border:1px solid var(--bd);
+  border-radius:12px;
+  backdrop-filter:blur(8px);
+}
+.game-filter-btn{
+  display:flex;align-items:center;gap:5px;
+  padding:5px 10px;border-radius:8px;
+  border:1px solid var(--bd);
+  background:rgba(255,255,255,0.03);
+  color:var(--d2);font-size:10px;font-weight:700;
+  font-family:var(--f);letter-spacing:0.8px;
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.game-filter-btn:hover{background:rgba(255,255,255,0.07);color:var(--t);border-color:rgba(255,255,255,0.15)}
+.game-filter-btn.active{background:rgba(0,245,196,0.1);border-color:rgba(0,245,196,0.3);color:var(--k)}
+.game-filter-btn img{width:14px;height:14px;border-radius:2px}
+.cd-lock{animation:glowPulse 3s ease infinite}
+
+
+/* ── SKELETON LOADING ── */
+.skeleton{
+  background:linear-gradient(90deg,rgba(255,255,255,0.04) 25%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.5s infinite;
+  border-radius:6px;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-card{
+  background:rgba(10,10,24,0.85);border:1px solid rgba(255,255,255,0.06);
+  border-radius:14px;padding:16px;margin-bottom:10px;
+}
+.skel-line{height:12px;margin-bottom:8px}
+.skel-line-sm{height:9px;margin-bottom:6px;width:60%}
+.skel-bar{height:6px;margin-top:10px}
+
+/* ── TOAST NOTIFICATIONS ── */
+#toast-container{
+  position:fixed;bottom:80px;right:20px;z-index:1000;
+  display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+.toast{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 16px;border-radius:10px;
+  background:rgba(12,12,30,0.95);
+  border:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(20px);
+  font-size:12px;font-family:var(--f);
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  pointer-events:all;
+  transform:translateX(120%);opacity:0;
+  transition:transform 0.35s cubic-bezier(0.4,0,0.2,1),opacity 0.35s ease;
+  max-width:300px;
+}
+.toast.show{transform:translateX(0);opacity:1}
+.toast.success{border-color:rgba(0,245,196,0.3);color:var(--k)}
+.toast.error{border-color:rgba(255,107,107,0.3);color:var(--r)}
+.toast.info{border-color:rgba(165,176,255,0.3);color:var(--p)}
+.toast-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.toast.success .toast-dot{background:var(--k);box-shadow:0 0 6px var(--k)}
+.toast.error .toast-dot{background:var(--r);box-shadow:0 0 6px var(--r)}
+.toast.info .toast-dot{background:var(--p);box-shadow:0 0 6px var(--p)}
+
+/* ── WIN PROBABILITY BAR ── */
+.prob-bar-wrap{
+  position:relative;height:3px;border-radius:6px;
+  background:rgba(255,255,255,0.06);overflow:hidden;
+  margin:10px 0 6px;
+}
+.prob-bar-away{
+  position:absolute;left:0;top:0;height:100%;
+  background:linear-gradient(90deg,var(--r),rgba(255,107,107,0.5));
+  border-radius:6px 0 0 6px;
+  transition:width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.prob-bar-home{
+  position:absolute;right:0;top:0;height:100%;
+  background:linear-gradient(90deg,rgba(0,245,196,0.5),var(--k));
+  border-radius:0 6px 6px 0;
+  transition:width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.prob-bar-labels{
+  display:flex;justify-content:space-between;
+  font-size:10px;font-family:var(--f);font-weight:700;
+}
+
+/* ── TOOLTIPS ── */
+.tt{position:relative;cursor:help}
+.tt::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:rgba(8,8,20,0.95);color:var(--d1);
+  font-size:10px;font-family:var(--f);font-weight:400;letter-spacing:0.3px;
+  padding:6px 10px;border-radius:6px;white-space:nowrap;
+  border:1px solid rgba(255,255,255,0.1);
+  box-shadow:0 4px 16px rgba(0,0,0,0.4);
+  opacity:0;pointer-events:none;
+  transition:opacity 0.15s ease, transform 0.15s ease;
+  transform:translateX(-50%) translateY(4px);
+  z-index:200;
+}
+.tt:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── ANIMATED COUNTER ── */
+.count-num{display:inline-block;transition:all 0.05s}
+
+
+/* ── GAME CARD HEADER ── */
+.game-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;cursor:pointer;user-select:none;
+  background:linear-gradient(90deg,rgba(255,255,255,0.025),rgba(255,255,255,0.015));
+  transition:background .15s;
+}
+.game-hdr:hover{background:linear-gradient(90deg,rgba(255,255,255,0.045),rgba(255,255,255,0.025))}
+.game-vs{
+  display:flex;align-items:center;gap:8px;
+}
+.game-team{
+  display:flex;align-items:center;gap:6px;
+}
+.game-team img{width:28px;height:28px;border-radius:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))}
+.game-team-name{font-size:15px;font-weight:800;letter-spacing:0.5px;font-family:var(--f)}
+.game-at{font-size:11px;color:var(--d4);font-weight:400;padding:0 2px}
+.game-time{font-size:10px;color:var(--d3);letter-spacing:1px;font-family:var(--f)}
+.game-meta{display:flex;align-items:center;gap:8px}
+
+/* ── PLAYER CARD ── */
+.player-card{
+  background:rgba(10,10,24,0.6);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:12px;padding:14px;margin-bottom:6px;
+  transition:border-color .15s, box-shadow .15s;
+}
+.player-card:hover{border-color:rgba(255,255,255,0.13)}
+.player-card.over-strong{
+  border-color:rgba(61,255,192,0.28);
+  background:linear-gradient(135deg,rgba(61,255,192,0.06),rgba(10,10,24,0.6));
+}
+.player-card.under-strong{
+  border-color:rgba(255,107,107,0.28);
+  background:linear-gradient(135deg,rgba(255,107,107,0.06),rgba(10,10,24,0.6));
+}
+.player-stat-grid{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:4px;
+  background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;
+  margin-bottom:8px;border:1px solid rgba(255,255,255,0.04);
+}
+
+/* ── TRADE EMPTY STATE ── */
+.trade-empty{
+  text-align:center;padding:48px 24px;
+}
+.trade-empty-icon{font-size:36px;margin-bottom:16px;opacity:0.5}
+.trade-empty-title{font-size:14px;font-weight:700;color:var(--d2);margin-bottom:8px;letter-spacing:1px}
+.trade-empty-sub{font-size:11px;color:var(--d4);line-height:1.6}
+
+/* ── WIN/LOSS TRACKER ── */
+.tracker-summary{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;
+}
+.tracker-tier{
+  background:rgba(10,10,24,0.8);border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:14px;text-align:center;
+  transition:border-color .15s;
+}
+.tracker-tier:hover{border-color:rgba(255,255,255,0.15)}
+.tracker-tier-name{font-size:9px;letter-spacing:2px;color:var(--d3);margin-bottom:6px}
+.tracker-tier-record{font-size:22px;font-weight:800;font-family:var(--f);line-height:1}
+.tracker-tier-pct{font-size:10px;margin-top:4px;font-weight:700}
+.tracker-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-radius:8px;margin-bottom:4px;
+  background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.05);
+  font-size:12px;transition:all .15s;
+}
+.tracker-row:hover{background:rgba(0,0,0,0.35);border-color:rgba(255,255,255,0.1)}
+.tracker-row.win{border-left:3px solid var(--g)}
+.tracker-row.loss{border-left:3px solid var(--r)}
+.tracker-row.pending{border-left:3px solid var(--d4)}
+
+/* ── SHIMMER ON LOCK BADGE ── */
+@keyframes shimmer-sweep{
+  0%{background-position:-200% center}
+  100%{background-position:200% center}
+}
+.conf-lock-shimmer{
+  background:linear-gradient(90deg,
+    rgba(0,245,196,0.1) 0%,
+    rgba(0,245,196,0.15) 40%,
+    rgba(255,255,255,0.3) 50%,
+    rgba(0,245,196,0.15) 60%,
+    rgba(0,245,196,0.1) 100%
+  );
+  background-size:200% auto;
+  animation:shimmer-sweep 2.5s linear infinite;
+}
+
+
+/* ── BACKTEST ── */
+.bt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.bt-stat{
+  background:rgba(10,10,24,0.8);border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:14px;text-align:center;
+}
+.bt-stat-val{font-size:26px;font-weight:800;font-family:var(--f);line-height:1}
+.bt-stat-lbl{font-size:9px;letter-spacing:1.8px;color:var(--d3);margin-top:4px}
+.bt-tier-row{
+  display:grid;grid-template-columns:80px 1fr 80px 80px 80px;
+  gap:8px;align-items:center;padding:10px 14px;
+  background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.05);
+  border-radius:8px;margin-bottom:4px;
+}
+.bt-bar-wrap{height:6px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden}
+.bt-bar-fill{height:100%;border-radius:4px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1)}
+.bt-day-row{
+  padding:8px 14px;border-radius:8px;margin-bottom:3px;
+  background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.04);
+  font-size:11px;display:flex;align-items:center;justify-content:space-between;
+  transition:background .15s;
+}
+.bt-day-row:hover{background:rgba(0,0,0,0.3)}
+
+/* ── WEIGHT OPTIMIZER ── */
+.wt-wrap{
+  background:rgba(10,10,24,0.8);border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;padding:16px;margin-bottom:10px;
+}
+.wt-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.wt-label{font-size:10px;font-weight:700;letter-spacing:1px;width:80px;flex-shrink:0}
+.wt-slider{
+  flex:1;-webkit-appearance:none;appearance:none;
+  height:4px;border-radius:4px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg, var(--slider-fill,var(--k)) var(--slider-pct,45%), rgba(255,255,255,0.08) var(--slider-pct,45%));
+}
+.wt-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;cursor:pointer;
+  border:2px solid var(--bg);box-shadow:0 0 8px rgba(0,0,0,0.4);
+}
+.wt-val{font-size:13px;font-weight:800;font-family:var(--f);width:36px;text-align:right;flex-shrink:0}
+.wt-total{
+  font-size:11px;font-weight:700;padding:8px 12px;border-radius:8px;
+  text-align:center;margin-top:4px;transition:all .15s;
+}
+.wt-preview{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px;
+}
+.wt-prev-card{
+  background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;padding:10px;text-align:center;
+}
+
+/* Meteor animation */
+@keyframes meteor{
+  0%{transform:rotate(215deg) translateX(0);opacity:1}
+  70%{opacity:1}
+  100%{transform:rotate(215deg) translateX(-500px);opacity:0}
+}
+
+.tab-badge{display:inline-block;background:var(--k);color:var(--bg);font-size:8px;font-weight:800;padding:1px 5px;border-radius:6px;margin-left:4px;vertical-align:middle}
+
+/* Tab icon alignment */
+.tab{display:flex;align-items:center;justify-content:center;gap:5px}
+.tab-icon{display:flex;align-items:center;flex-shrink:0}
+
+.section-label{font-size:9px;color:var(--d3);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--bd)}
+
+.win-prob-large{font-size:36px;font-weight:800;line-height:1;font-family:var(--f);letter-spacing:-1px}
+.win-prob-medium{font-size:22px;font-weight:800;font-family:var(--f)}
+</style>
+</head>
+<body>
+<!-- Background canvas for animated paths + meteors -->
+<canvas id="bg-canvas"></canvas>
+<div id="toast-container"></div>
+
+<div class="app">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="delta-mark">
+        <span class="delta-symbol">Δ</span>
+        <span class="delta-name">DELTA</span>
+      </div>
+      <div class="hdr-sub">3-MODEL · KALSHI · KELLY</div>
+    </div>
+    <div class="hdr-right">
+      <div class="bridge-indicator" onclick="checkBridge()" title="Click to reconnect">
+        <span id="bridge-dot" style="display:flex;align-items:center;width:16px;height:16px">
+          <svg id="bridge-face-ok" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48" style="display:none"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"/><path stroke="#fff" stroke-linecap="round" d="M17 31C17 31 19 35 24 35C29 35 31 31 31 31"/><path stroke="#fff" stroke-linecap="round" d="M16 16L19 19L16 22"/><path stroke="#fff" stroke-linecap="round" d="M32 16L29 19L32 22"/></g></svg>
+          <svg id="bridge-face-err" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"/><path stroke="#fff" stroke-linecap="round" d="M19 18L15 22"/><path stroke="#fff" stroke-linecap="round" d="M15 18L19 22"/><path stroke="#fff" stroke-linecap="round" d="M33 18L29 22"/><path stroke="#fff" stroke-linecap="round" d="M29 18L33 22"/><rect width="8" height="8" x="20" y="28" fill="#43ccf8" stroke="#fff" stroke-linecap="round" rx="4"/></g></svg>
+        </span>
+        <span id="bridge-label" style="color:var(--d3)">BRIDGE</span>
+      </div>
+      <div class="bankroll-inline">
+        <label>BANKROLL $</label>
+        <input type="number" id="bankroll" value="100" oninput="reCalc();persistSettings()">
+      </div>
+      <select id="kelly-frac" class="kelly-sel" onchange="reCalc();persistSettings()">
+        <option value="0.25">¼ Kelly</option>
+        <option value="0.5" selected>½ Kelly</option>
+        <option value="1">Full</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab on-k" data-t="kalshi" onclick="go('kalshi')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14"><g fill="none"><path fill="#8fbffa" d="M2.329 9.704c1.806 2.121 6.056 2.121 7.863 0c1.663-1.954 1.537-5.777-.465-7.45c-1.794-1.498-5.14-1.498-6.933 0C.792 3.927.665 7.75 2.329 9.704"/><path fill="#2859c5" fill-rule="evenodd" d="M3.275 2.83c.729-.61 1.828-.95 2.985-.95s2.257.34 2.986.95c.795.664 1.272 1.814 1.339 3.083s-.286 2.509-.964 3.305c-.72.845-1.994 1.327-3.36 1.327c-1.367 0-2.641-.482-3.361-1.327c-.678-.796-1.03-2.036-.964-3.305s.544-2.42 1.339-3.083m6.932-1.151C9.143.789 7.673.38 6.26.38c-1.412 0-2.883.41-3.947 1.299C1.106 2.687.519 4.285.438 5.834c-.082 1.55.334 3.199 1.32 4.356c1.086 1.276 2.84 1.855 4.502 1.855c1.15 0 2.343-.277 3.33-.87a1 1 0 0 0 .105.122l2 2a1.1 1.1 0 0 0 1.556-1.556l-2-2a1 1 0 0 0-.095-.084c.702-1.1.996-2.498.927-3.823c-.082-1.549-.668-3.147-1.876-4.155m-4.67 5.733a.625.625 0 1 1-.92.846L3.123 6.636a.625.625 0 0 1 0-.846l1.492-1.623a.625.625 0 0 1 .92.846l-1.103 1.2l1.103 1.2Zm1.484.884a.625.625 0 0 1-.037-.884l1.103-1.2l-1.103-1.199a.625.625 0 0 1 .92-.846L9.397 5.79c.22.239.22.607 0 .846L7.904 8.258a.625.625 0 0 1-.883.038" clip-rule="evenodd"/></g></svg></span>
+      ANALYSIS
+    </button>
+    <button class="tab" data-t="trade" onclick="go('trade')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span>
+      TRADE
+    </button>
+    <button class="tab" data-t="props" onclick="go('props')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48"><g fill="none" stroke-width="3"><path fill="#fff" d="M6 39c0 3.314 8.059 6 18 6s18-2.686 18-6s-8.059-6-18-6s-18 2.686-18 6"/><path fill="#8fbffa" d="M27.386 15.05a6.5 6.5 0 1 0-6.77 0c-.991.03-1.851.072-2.58.116c-1.913.117-3.566 1.278-4.188 3.09a36 36 0 0 0-1.605 6.91a2.63 2.63 0 0 0 2.13 2.95a49 49 0 0 0 2.752.437l.69 8.612c.109 1.372 1.14 2.494 2.509 2.633c1.06.107 2.368.202 3.677.202s2.617-.095 3.677-.202c1.37-.14 2.4-1.26 2.51-2.633l.689-8.612a49 49 0 0 0 2.751-.437a2.63 2.63 0 0 0 2.131-2.95a36 36 0 0 0-1.605-6.91c-.622-1.812-2.275-2.973-4.188-3.09a85 85 0 0 0-2.58-.116"/><path stroke="#2859c5" stroke-linecap="round" stroke-linejoin="round" d="M35.5 34.384c3.971 1.1 6.5 2.76 6.5 4.616c0 3.313-8.059 6-18 6S6 42.313 6 39c0-1.856 2.528-3.516 6.5-4.616"/><path stroke="#2859c5" stroke-linecap="round" stroke-linejoin="round" d="M27.385 15.05a6.5 6.5 0 1 0-6.77 0c-.992.03-1.851.072-2.58.116c-1.913.117-3.566 1.278-4.188 3.09a36 36 0 0 0-1.605 6.91a2.63 2.63 0 0 0 2.13 2.95a49 49 0 0 0 2.752.437l.69 8.612c.109 1.372 1.14 2.494 2.509 2.633c1.06.107 2.368.202 3.677.202s2.617-.095 3.677-.202c1.37-.14 2.4-1.26 2.51-2.633l.689-8.612a49 49 0 0 0 2.751-.437a2.63 2.63 0 0 0 2.131-2.95a36 36 0 0 0-1.605-6.91c-.622-1.812-2.275-2.973-4.188-3.09a85 85 0 0 0-2.58-.116M24 31v9"/></g></svg></span>
+      PROPS
+    </button>
+    <button class="tab" data-t="value" onclick="go('value')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 72 72"><path fill="#0096d1" d="m26.1 49.8l9.6 21.8c0 .1-.1.1-.1.1L16.9 49.8zm-8.8-20.1H.1c0 .7 1.1 1.6 1.1 1.6l15.7 18.5l6.3-6.7z"/><path fill="#76dfff" d="M71.5 30.5c-.5.5-1.3.5-1.8 0c-.2-.2-.4-.6-.4-.9H54.6l-9.2-10L55 9.5l16.3 19.1s0 .1.1.1h.1c.5.6.5 1.4 0 1.8m-35.6-.8l9.4-10l-9.4-10.2l-9.4 10.2z"/><path fill="#59cafc" d="M36.3 71.7c-.1.1-.2 0-.1-.1l9.6-21.8H55zm12.4-28.6l6.3 6.7l16.4-19.2s.4-.6.4-.9H54.6z"/><path fill="#27c7ff" d="m26.5 19.7l-9.2 10h18.6z"/><path fill="#b0e9ff" d="m45.4 19.7l-9.5 10h18.7z"/><path fill="#00b1ff" d="m26.5 19.7l-9.2 10H.1s.1-.6.5-1l15.8-18.5c.1-.1.2-.2.3-.2c.2-.3.5-.4.9-.4c.7 0 1.2.6 1.2 1.2c0 .2-.1.4-.2.6zm9.4 10l12.8 13.5l5.9-13.5zm-18.6 0l5.9 13.5L36 29.7zm8.8 20.1l9.7 22q.15.15.3 0l9.7-22zm22.6-6.7l-2.9 6.7H55z"/><path fill="#59cafc" d="M45.4 19.7L35.9 9.5H55zM35.9 9.5H18c-.4 0-1.2 0-.9.3l9.4 9.9z"/><path fill="#0074a8" d="m23.2 43.1l-6.3 6.7h9.2z"/><path fill="#0096d1" d="m23.2 43.1l2.9 6.7h19.7l2.9-6.7l-12.8-13.4z"/><path fill="#fff" d="M52.7 29.9c2.7.7 4.8 2.8 5.5 5.5c.1.3.4.3.5 0c.7-2.7 2.8-4.8 5.5-5.5c.3-.1.3-.4 0-.5c-2.7-.7-4.8-2.8-5.5-5.5c-.1-.3-.4-.3-.5 0c-.7 2.7-2.8 4.8-5.5 5.5c-.3.1-.3.4 0 .5"/><path fill="#b0e9ff" d="M42.6 3.6c1.4.4 2.5 1.5 2.9 2.9c0 .1.2.1.2 0c.4-1.4 1.5-2.5 2.9-2.9c.1 0 .1-.2 0-.2c-1.4-.4-2.5-1.5-2.9-2.9c0-.1-.2-.1-.2 0c-.4 1.4-1.5 2.5-2.9 2.9c-.1 0-.1.2 0 .2"/></svg></span>
+      VALUE
+    </button>
+    <button class="tab" data-t="kelly" onclick="go('kelly')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M40 4H8.0002C6.89565 4 6.00022 4.89541 6.0002 5.99996L5.99955 42C5.99953 43.1045 6.89497 44 7.99955 44H40C41.1046 44 42 43.1046 42 42V6C42 4.89543 41.1046 4 40 4Z"/><path fill="#43ccf8" stroke="#fff" d="M35 10H13V19H35V10Z"/><path stroke="#fff" stroke-linecap="round" d="M12 28L19 35"/><path stroke="#fff" stroke-linecap="round" d="M19 28L12 35"/><path stroke="#fff" stroke-linecap="round" d="M28 35H36"/><path stroke="#fff" stroke-linecap="round" d="M28 29H36"/></g></svg></span>
+      KELLY
+    </button>
+    <button class="tab" data-t="tracker" onclick="go('tracker')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+      TRACK
+    </button>
+    <button class="tab" data-t="data" onclick="go('data')">
+      <span class="tab-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M10 6C10 4.89543 10.8954 4 12 4H40C41.1046 4 42 4.89543 42 6V42C42 43.1046 41.1046 44 40 44H12C10.8954 44 10 43.1046 10 42V6Z"/><path stroke="#fff" stroke-linecap="round" d="M34 6V42"/><path stroke="#000" stroke-linecap="round" d="M6 14H14"/><path stroke="#000" stroke-linecap="round" d="M6 24H14"/><path stroke="#000" stroke-linecap="round" d="M6 34H14"/><path stroke="#000" stroke-linecap="round" d="M27 4H39"/><path stroke="#000" stroke-linecap="round" d="M27 44H39"/></g></svg></span>
+      DATA
+    </button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- ═══ KALSHI ═══ -->
+    <div class="panel on" id="p-kalshi">
+      <div id="data-status" class="status-bar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"/><path stroke="#fff" stroke-linecap="round" d="M31 31C31 31 29 35 24 35C19 35 17 31 17 31"/><path stroke="#fff" stroke-linecap="round" d="M31 18V22"/><path stroke="#fff" stroke-linecap="round" d="M17 18V22"/></g></svg>
+        <span>No data loaded — go to DATA tab to load, or ask Claude to scrape</span>
+      </div>
+      <div id="kalshi-games"></div>
+      <div id="kalshi-analysis"></div>
+    </div>
+
+    <!-- ═══ TRADE ═══ -->
+    <div class="panel" id="p-trade">
+      <!-- API Status -->
+      <div class="cd cd-hl">
+        <div class="flex-b">
+          <div>
+            <div class="fs9 ck fw7 ls1 mb6">TRADING TERMINAL</div>
+            <div class="fs12 fw8">BRIDGE: <span id="api-status" class="cr">CHECKING...</span></div>
+            <div class="fs8 cd3 mt6">Requires bridge.py running on localhost:5000</div>
+          </div>
+          <div class="tr">
+            <div class="st-l">KALSHI BAL</div>
+            <div id="api-balance" class="fs14 fw8 ck">—</div>
+          </div>
+        </div>
+      </div>
+
+ <!-- Market Search -->
+      <div class="cd mt8">
+        <div class="fs9 cd3 ls2 mb8">SEARCH KALSHI MARKETS</div>
+        <div class="flex gap8">
+          <input type="text" id="mkt-search" class="inp inp-sm" style="flex:1" placeholder="Search player name, team, or ticker..." onkeydown="if(event.key==='Enter')searchKalshi()">
+          <button class="btn btn-k" onclick="searchKalshi()">SEARCH</button>
+        </div>
+        <div class="flex gap6 mt6 wrap">
+          <button class="btn" style="padding:4px 10px;font-size:10px" onclick="el('mkt-search').value='KXNBA2D';searchKalshi()">NBA Props</button>
+          <button class="btn" style="padding:4px 10px;font-size:10px" onclick="quickSearchPlayers()">All Player Props</button>
+        </div>
+        <div class="flex gap8 mt8">
+          <input type="text" id="direct-ticker" class="inp inp-sm" style="flex:1" placeholder="Paste exact ticker e.g. KXNBA2D-26MAR17DETWAS-DETCCUNNINGHAM2">
+          <button class="btn btn-k" onclick="loadDirectTicker()">LOAD</button>
+        </div>
+        <div id="mkt-results" class="mt8"></div>
+      </div>
+      <!-- Selected Market + Orderbook -->
+      <div id="trade-detail" style="display:none">
+        <div class="cd mt8">
+          <div class="flex-b mb8">
+            <div>
+              <div class="fs9 ck fw7 ls1 mb6">ORDER BOOK</div>
+              <div id="ob-title" class="fs12 fw8"></div>
+              <div id="ob-ticker" class="fs8 cd3 mt6"></div>
+            </div>
+            <button class="btn" style="padding:4px 10px;font-size:10px" onclick="refreshOrderbook()">↻ REFRESH</button>
+          </div>
+          <div class="g2" id="ob-display"></div>
+        </div>
+
+<!-- Trade Form -->
+        <div class="trade-form mt8">
+          <div class="fs9 ck fw7 ls1 mb8">📝 PLACE ORDER</div>
+          <div class="g3 mb8">
+            <div>
+              <div class="st-l">SIDE</div>
+              <select id="trade-side" class="inp inp-sm" style="font-size:13px" onchange="updateTradePreview()">
+                <option value="no" selected>NO (Under)</option>
+                <option value="yes">YES (Over)</option>
+              </select>
+            </div>
+            <div>
+              <div class="st-l">PRICE (¢)</div>
+              <input type="number" id="trade-price" class="inp inp-sm tc" placeholder="55" min="1" max="99" oninput="updateTradePreview()">
+            </div>
+            <div>
+              <div class="st-l">CONTRACTS</div>
+              <input type="number" id="trade-count" class="inp inp-sm tc" placeholder="10" min="1" oninput="updateTradePreview()">
+            </div>
+          </div>
+
+          <!-- Quick sizing buttons -->
+          <div class="mb8">
+            <div class="fs8 cd3 ls1 mb6">QUICK SIZE</div>
+            <div class="flex gap6 wrap">
+              <button class="btn" style="padding:4px 10px;font-size:10px" onclick="quickSize(1)">$1</button>
+              <button class="btn" style="padding:4px 10px;font-size:10px" onclick="quickSize(5)">$5</button>
+              <button class="btn" style="padding:4px 10px;font-size:10px" onclick="quickSize(10)">$10</button>
+              <button class="btn" style="padding:4px 10px;font-size:10px" onclick="quickSize(25)">$25</button>
+              <button class="btn" style="padding:4px 10px;font-size:10px" onclick="quickSize(50)">$50</button>
+            </div>
+          </div>
+
+          <!-- Order preview -->
+          <div id="trade-preview" class="mb8" style="background:var(--bg);border-radius:8px;padding:12px"></div>
+
+          <!-- Place button -->
+          <div id="trade-submit-btn" class="trade-confirm" onclick="submitTrade()">PLACE ORDER</div>
+          <div id="trade-log" class="mt8"></div>
+        </div>
+
+</div><!-- /trade-detail -->
+
+      <!-- Positions & Orders -->
+      <div class="g2 mt12">
+        <div class="cd">
+          <div class="flex-b mb8">
+            <div class="fs9 cd3 ls2">📦 POSITIONS</div>
+            <button class="btn" style="padding:3px 8px;font-size:9px" onclick="loadPositions()">REFRESH</button>
+          </div>
+          <div id="positions-list"><div class="fs9 cd3 tc">Click refresh to load</div></div>
+        </div>
+        <div class="cd">
+          <div class="flex-b mb8">
+            <div class="fs9 cd3 ls2">RECENT ORDERS</div>
+            <button class="btn" style="padding:3px 8px;font-size:9px" onclick="loadOrders()">REFRESH</button>
+          </div>
+          <div id="orders-list"><div class="fs9 cd3 tc">Click refresh to load</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+      <div style="background:var(--s);border:1px solid var(--kbd);border-radius:16px;padding:24px;max-width:340px;width:90%;margin:auto">
+        <div class="fs9 ck fw7 ls1 mb12 tc">⚠️ CONFIRM ORDER</div>
+        <div id="modal-details" style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:16px"></div>
+        <div class="g2" style="gap:10px">
+          <button class="btn" style="padding:12px;font-size:12px;width:100%" onclick="closeModal()">CANCEL</button>
+          <button class="trade-confirm" style="font-size:12px" onclick="confirmTrade()">CONFIRM BET</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PROPS ═══ -->
+    <div class="panel" id="p-props">
+      <div class="search">
+        <input type="text" id="ps" placeholder="Search to add more players..." oninput="pSearch(this.value)" onfocus="document.getElementById('psr').classList.add('open')" onblur="setTimeout(()=>document.getElementById('psr').classList.remove('open'),200)">
+        <div class="sres" id="psr"></div>
+      </div>
+      <div class="flex-b mb8">
+        <div class="fs9 cd3 ls1">Projections vs Kalshi lines</div>
+        <button class="btn btn-k" style="padding:5px 10px;font-size:10px" onclick="fetchKalshiProps()">FETCH KALSHI LINES</button>
+      </div>
+      <div id="props-list">
+        <div class="empty"><i><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 48 48"><g fill="none" stroke-width="3"><path fill="#8fbffa" d="M24 3c11.598 0 21 9.402 21 21s-9.402 21-21 21S3 35.598 3 24S12.402 3 24 3"/><path fill="#fff" d="M9 24c0-8.284 6.716-15 15-15s15 6.716 15 15s-6.716 15-15 15S9 32.284 9 24"/><path stroke="#2859c5" stroke-linecap="round" stroke-linejoin="round" d="M24 9v4m15 11h-4M24 39v-4M9 24h4m8 0h6m-3-3v6"/></g></svg></i><div class="fs12 cd2">Load data in 📡 tab — all players auto-populate here</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ VALUE ═══ -->
+    <div class="panel" id="p-value">
+      <div id="value-list">
+        <div class="empty"><i><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 72 72"><path fill="#0096d1" d="m26.1 49.8l9.6 21.8c0 .1-.1.1-.1.1L16.9 49.8zm-8.8-20.1H.1c0 .7 1.1 1.6 1.1 1.6l15.7 18.5l6.3-6.7z"/><path fill="#76dfff" d="M71.5 30.5c-.5.5-1.3.5-1.8 0c-.2-.2-.4-.6-.4-.9H54.6l-9.2-10L55 9.5l16.3 19.1s0 .1.1.1h.1c.5.6.5 1.4 0 1.8m-35.6-.8l9.4-10l-9.4-10.2l-9.4 10.2z"/><path fill="#59cafc" d="M36.3 71.7c-.1.1-.2 0-.1-.1l9.6-21.8H55zm12.4-28.6l6.3 6.7l16.4-19.2s.4-.6.4-.9H54.6z"/><path fill="#00b1ff" d="m26.5 19.7l-9.2 10H.1s.1-.6.5-1l15.8-18.5c.1-.1.2-.2.3-.2c.2-.3.5-.4.9-.4c.7 0 1.2.6 1.2 1.2c0 .2-.1.4-.2.6zm9.4 10l12.8 13.5l5.9-13.5zm-18.6 0l5.9 13.5L36 29.7zm8.8 20.1l9.7 22q.15.15.3 0l9.7-22zm22.6-6.7l-2.9 6.7H55z"/></svg></i><div class="fs12 cd2">Load data to see value picks</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ KELLY ═══ -->
+    <div class="panel" id="p-kelly">
+      <div id="kelly-list">
+        <div class="empty"><i><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M40 4H8C6.9 4 6 4.9 6 6v36c0 1.1.9 2 2 2h32c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"/><path fill="#43ccf8" stroke="#fff" d="M35 10H13V19H35V10Z"/><path stroke="#fff" stroke-linecap="round" d="M12 28L19 35M19 28L12 35M28 35H36M28 29H36"/></g></svg></i><div class="fs12 cd2">Enter Kalshi prices to see Kelly bet sizing</div></div>
+      </div>
+    </div>
+
+
+    <!-- ═══ TRACKER ═══ -->
+    <div class="panel" id="p-tracker">
+
+      <!-- Sub-tab bar -->
+      <div style="display:flex;gap:4px;margin-bottom:14px;background:rgba(0,0,0,0.3);border-radius:10px;padding:4px;border:1px solid var(--bd)">
+        <button id="sub-tracker" class="btn btn-k btn-full" style="border-radius:7px;font-size:10px" onclick="switchSub('tracker')">TRACKER</button>
+        <button id="sub-backtest" class="btn btn-full" style="border-radius:7px;font-size:10px" onclick="switchSub('backtest')">BACKTEST</button>
+        <button id="sub-weights" class="btn btn-full" style="border-radius:7px;font-size:10px" onclick="switchSub('weights')">WEIGHTS</button>
+      </div>
+
+      <!-- TRACKER sub-panel -->
+      <div id="sub-p-tracker">
+        <div class="cd cd-hl" style="margin-bottom:10px">
+          <div class="flex-b">
+            <div>
+              <div class="fs9 ck fw7 ls1 mb6">WIN / LOSS TRACKER</div>
+              <div class="fs10 cd3">Predictions logged automatically when data loads · Results checked next day</div>
+            </div>
+            <div class="flex gap6">
+              <button class="btn btn-k" style="padding:5px 12px;font-size:10px" onclick="checkResults()">CHECK RESULTS</button>
+              <button class="btn btn-d" style="padding:5px 12px;font-size:10px" onclick="clearTracker()">CLEAR</button>
+            </div>
+          </div>
+        </div>
+        <div id="tracker-summary" class="tracker-summary"></div>
+        <div id="tracker-list"></div>
+      </div>
+
+      <!-- BACKTEST sub-panel -->
+      <div id="sub-p-backtest" style="display:none">
+        <div class="cd cd-hl" style="margin-bottom:12px">
+          <div class="flex-b">
+            <div>
+              <div class="fs9 ck fw7 ls1 mb6">BACKTEST ENGINE</div>
+              <div class="fs10 cd3">Fetches last N days of ESPN results and runs models against actual outcomes</div>
+            </div>
+            <div class="flex gap6" style="align-items:center">
+              <select id="bt-days" class="kelly-sel" style="font-size:10px">
+                <option value="7">7 days</option>
+                <option value="14" selected>14 days</option>
+                <option value="21">21 days</option>
+                <option value="30">30 days</option>
+                <option value="45">45 days</option>
+                <option value="60">60 days</option>
+                <option value="90">90 days</option>
+              </select>
+              <button class="btn btn-k" style="padding:5px 12px;font-size:10px" onclick="runBacktest()">RUN BACKTEST</button>
+            </div>
+          </div>
+        </div>
+        <div id="bt-results"></div>
+      </div>
+
+      <!-- WEIGHTS sub-panel -->
+      <div id="sub-p-weights" style="display:none">
+        <div class="wt-wrap">
+          <div class="fs9 ck fw7 ls1 mb10">MODEL WEIGHTS</div>
+          <div class="fs10 cd3 mb12">Adjust how much each model contributes to the final consensus. Total must equal 100%.</div>
+
+          <div class="wt-row">
+            <span class="wt-label" style="color:var(--p)">A · EFF</span>
+            <input type="range" class="wt-slider" id="wt-a" min="10" max="80" value="50"
+              style="--slider-fill:var(--p)"
+              oninput="updateWeights()">
+            <span class="wt-val cp" id="wt-a-val">50%</span>
+          </div>
+          <div class="wt-row">
+            <span class="wt-label" style="color:var(--y)">B · MOM</span>
+            <input type="range" class="wt-slider" id="wt-b" min="10" max="80" value="35"
+              style="--slider-fill:var(--y)"
+              oninput="updateWeights()">
+            <span class="wt-val cy" id="wt-b-val">35%</span>
+          </div>
+          <div class="wt-row" style="margin-bottom:4px">
+            <span class="wt-label" style="color:var(--b)">C · MATCH</span>
+            <input type="range" class="wt-slider" id="wt-c" min="10" max="80" value="15"
+              style="--slider-fill:var(--b)"
+              oninput="updateWeights()">
+            <span class="wt-val cb" id="wt-c-val">15%</span>
+          </div>
+
+          <div id="wt-total" class="wt-total"></div>
+          <button class="btn btn-k btn-full mt8" style="font-size:10px" onclick="applyWeights()">APPLY WEIGHTS & RECALCULATE</button>
+          <button class="btn btn-full mt6" style="font-size:10px" onclick="resetWeights()">RESET TO DEFAULT (50/35/15)</button>
+        </div>
+
+        <!-- Live preview when data loaded -->
+        <div id="wt-preview-wrap" style="display:none">
+          <div class="section-label">PREVIEW WITH CURRENT DATA</div>
+          <div id="wt-preview"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══ DATA ═══ -->
+    <div class="panel" id="p-data">
+      <div class="cd cd-hl">
+        <div class="fs9 ck fw7 ls1 mb6">LOAD DATA</div>
+        <div class="fs10 cd2" style="line-height:1.7">
+          Paste the JSON blob from Claude below. This contains tonight's games, team ratings, Kalshi prices, player stats, and injury data. One paste = everything updates.
+        </div>
+      <div class="loader mt8">
+        <textarea id="json-input" placeholder='Paste JSON data here...'></textarea>
+        <button class="btn btn-k btn-full mt8" onclick="loadJSON()">LOAD DATA</button>
+      </div>
+      <div id="data-log" class="mt10"></div>
+<!-- Date selector -->
+      <div class="mb10 mt8">
+        <!-- Manual Injury Input -->
+<div class="mb12">
+  <div class="fs8 cd3 ls1 mb6">MANUAL INJURY OVERRIDE</div>
+  <div class="flex gap6 mb6">
+    <input type="text" id="inj-name" class="inp" placeholder="Player name..." style="flex:2" oninput="injSearch(this.value)">
+    <select id="inj-status" class="inp" style="flex:1">
+      <option value="OUT">OUT</option>
+      <option value="GTD">GTD</option>
+      <option value="PLAY">PLAY</option>
+    </select>
+  </div>
+  <div id="inj-search-results" class="sr-wrap" style="display:none;margin-bottom:6px"></div>
+  <div class="flex gap6 mb6">
+    <label class="flex gap4" style="align-items:center;cursor:pointer;font-size:11px;color:var(--d2)">
+      <input type="checkbox" id="inj-star"> ⭐ Star
+    </label>
+    <label class="flex gap4" style="align-items:center;cursor:pointer;font-size:11px;color:var(--d2)">
+      <input type="checkbox" id="inj-starter" checked> Starter
+    </label>
+  </div>
+  <button class="btn btn-k btn-full mb6" onclick="addManualInjury()">+ ADD INJURY</button>
+  <div id="manual-injuries-list" style="max-height:120px;overflow-y:auto"></div>
+</div>
+        <div class="fs8 cd3 ls1 mb6">SELECT DATE</div>
+        <div class="flex gap6 wrap" id="date-btns">
+          <button class="btn btn-k" onclick="setFetchDate(0)" id="date-btn-0">📅 TODAY</button>
+          <button class="btn" onclick="setFetchDate(1)" id="date-btn-1">+1 DAY</button>
+          <button class="btn" onclick="setFetchDate(2)" id="date-btn-2">+2 DAYS</button>
+          <button class="btn" onclick="setFetchDate(3)" id="date-btn-3">+3 DAYS</button>
+        </div>
+        <div id="selected-date-label" class="fs9 cd3 mt6"></div>
+      </div>
+      <div class="flex gap8 mb10">
+        <button class="btn btn-k btn-full" onclick="autoFetch()" id="auto-fetch-btn">AUTO-FETCH ESPN DATA</button>
+      </div>
+      <div class="flex gap8 mb10">
+        <button class="btn btn-full" onclick="deepFetch()" id="deep-fetch-btn" style="border-color:rgba(157,166,255,0.4);background:rgba(157,166,255,0.08);color:var(--p)">🔬 DEEP FETCH — with player stats (~15s)</button>
+      </div>
+      <div class="cd mt12">
+        <div class="fs9 cd3 ls2 mb6">CURRENT DATA</div>
+        <div id="data-summary" class="fs10 cd2" style="line-height:2">
+          No data loaded yet.
+        </div>
+      </div>
+      <div class="flex gap8 mb10">
+        <button class="btn btn-full" onclick="fetchVegas()" id="vegas-btn" style="border-color:rgba(255,200,50,0.4);background:rgba(255,200,50,0.08);color:var(--y)">🎰 FETCH VEGAS ODDS</button>
+      </div>  
+      <div class="cd mt8">
+        <div class="fs9 cd3 ls2 mb6">JSON FORMAT</div>
+        <div class="fs9 cd3" style="line-height:1.8">
+          <pre style="background:var(--bg);padding:12px;border-radius:8px;overflow-x:auto;font-size:11px;color:var(--d2)">{
+  "date": "Mar 17, 2026",
+  "games": [
+    {"id":"g1","h":"ATL","a":"ORL","t":"7:00 PM",
+     "hp":58,"ap":42,"kH":58,"kA":42}
+  ],
+  "teams": {
+    "ATL":{"ortg":115.2,"drtg":114.1,"pace":101.9,
+           "w":36,"l":31,"net":1.1}
+  },
+  "players": [
+    {"name":"Luka Doncic","team":"LAL","opp":"HOU",
+     "pos":"PG","szn":32.8,"l5":38.2,"min":35.7,
+     "line":32.5,"status":"PLAY",
+     "note":"L5: 44,35,31,51,30"}
+  ],
+  "injuries": {
+    "LAL":[{"p":"Maxi Kleber","s":"OUT"}]
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let D = { date:"", games:[], teams:{}, players:[], injuries:{} };
+let tracked = [];
+let vegasOdds = {}; // keyed by "HOME_ABBR" → {hProb, aProb, hOdds, aOdds}
+const AVG_ORTG = 113.5, AVG_DRTG = 112.5, AVG_PACE = 99.2;
+function logoAbbr(abbr) {
+  const m = {'NOP':'no','UTA':'utah','GSW':'gs','NYK':'ny','SAS':'sa','WAS':'wsh'};
+  return (m[abbr] || abbr).toLowerCase();
+}
+const BRIDGE = 'http://127.0.0.1:5001';
+let bridgeOK = false;
+let selectedTicker = null;
+let fetchDateOffset = 0; // 0 = today, 1 = tomorrow, etc.
+const propCollapsed = {};
+const kalshiCollapsed = {};
+let activeGameFilter = null; // null = show all
+let kalshiMarkets = []; // cached search results
+async function autoFetch() {
+  const btn = el('auto-fetch-btn');
+  btn.textContent = '⏳ FETCHING...';
+  btn.disabled = true;
+  try {
+    const d = await bridgeGet('/fetch-espn?offset=' + fetchDateOffset);
+    el('json-input').value = JSON.stringify(d, null, 2);
+    loadJSON();
+    btn.textContent = '✅ LOADED!';
+    setTimeout(() => { btn.textContent = 'AUTO-FETCH ESPN DATA'; btn.disabled = false; }, 3000);
+  } catch(e) {
+    btn.textContent = '❌ ERROR — bridge offline?';
+    btn.disabled = false;
+  }
+}
+
+async function fetchVegas() {
+  const btn = el('vegas-btn');
+  btn.textContent = '⏳ FETCHING...';
+  btn.disabled = true;
+  try {
+    const d = await bridgeGet('/odds');
+    vegasOdds = {};
+    d.games.forEach(g => {
+      if (g.hAbbr) vegasOdds[g.hAbbr] = {
+        hProb: g.home_prob, aProb: g.away_prob,
+        hOdds: g.home_odds, aOdds: g.away_odds,
+        aAbbr: g.aAbbr
+      };
+    });
+    btn.textContent = `✅ VEGAS LOADED`;
+    showToast(`Vegas odds loaded · ${d.requests_remaining} requests remaining`, 'info');
+    setTimeout(() => { btn.textContent = '🎰 FETCH VEGAS ODDS'; btn.disabled = false; }, 4000);
+    renderKalshi();
+  } catch(e) {
+    btn.textContent = '❌ ERROR';
+    btn.disabled = false;
+  }
+}
+
+function setFetchDate(offset) {
+  fetchDateOffset = offset;
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  const label = d.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
+  el('selected-date-label').textContent = `Fetching games for: ${label}`;
+  // Update button styles
+  [0,1,2,3].forEach(i => {
+    const btn = el(`date-btn-${i}`);
+    btn.className = i === offset ? 'btn btn-k' : 'btn';
+  });
+}
+async function deepFetch() {
+  const btn = el('deep-fetch-btn');
+  btn.textContent = '⏳ FETCHING DEEP DATA (~15s)...';
+  btn.disabled = true;
+  try {
+    const d = await bridgeGet('/fetch-espn-deep?offset=' + fetchDateOffset);
+    el('json-input').value = JSON.stringify(d, null, 2);
+    loadJSON();
+    btn.textContent = '✅ DEEP LOADED!';
+    setTimeout(() => { btn.textContent = '🔬 DEEP FETCH — with player stats (~15s)'; btn.disabled = false; }, 3000);
+  } catch(e) {
+    btn.textContent = '❌ ERROR — bridge offline?';
+    btn.disabled = false;
+  }
+}
+// ═══════════════════════════════════════════════════════
+// BRIDGE CONNECTION
+// ═══════════════════════════════════════════════════════
+async function checkBridge() {
+  const lbl = el('bridge-label');
+  const apiStat = el('api-status');
+  const apiBal = el('api-balance');
+  const faceOk = el('bridge-face-ok');
+  const faceErr = el('bridge-face-err');
+  try {
+    const r = await fetch(BRIDGE + '/status', {signal: AbortSignal.timeout(3000)});
+    const d = await r.json();
+    if (d.auth) {
+      bridgeOK = true;
+      if (faceOk) faceOk.style.display = 'block';
+      if (faceErr) faceErr.style.display = 'none';
+      lbl.style.color = 'var(--g)';
+      lbl.textContent = 'LIVE';
+      if (!bridgeOK) showToast('Bridge connected', 'success', 2000);
+      apiStat.textContent = 'CONNECTED';
+      apiStat.className = 'cg';
+      apiBal.textContent = '$' + (d.balance / 100).toFixed(2);
+    } else {
+      throw new Error(d.message || 'Auth failed');
+    }
+  } catch(e) {
+    bridgeOK = false;
+    if (faceOk) faceOk.style.display = 'none';
+    if (faceErr) faceErr.style.display = 'block';
+    lbl.style.color = 'var(--r)';
+    lbl.textContent = 'OFF';
+    apiStat.textContent = 'DISCONNECTED — run bridge.py';
+    apiStat.className = 'cr';
+    apiBal.textContent = '—';
+  }
+}
+
+async function bridgeGet(path) {
+  if (!bridgeOK) { await checkBridge(); if (!bridgeOK) throw new Error('Bridge offline'); }
+  const r = await fetch(BRIDGE + path);
+  const d = await r.json();
+  if (d.error) throw new Error(d.error);
+  return d;
+}
+
+async function cancelOrder(orderId) {
+  const out = el('orders-list');
+  try {
+    const result = await bridgePost('/cancel_order', { order_id: orderId });
+    if (result.status === 'cancelled') {
+      loadOrders();
+      checkBridge();
+    } else {
+      alert('Cancel failed: ' + result.message);
+    }
+  } catch(e) {
+    alert('Cancel error: ' + e.message);
+  }
+}
+
+async function bridgePost(path, body) {
+  if (!bridgeOK) { await checkBridge(); if (!bridgeOK) throw new Error('Bridge offline'); }
+  const r = await fetch(BRIDGE + path, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  return await r.json();
+}
+
+// ═══════════════════════════════════════════════════════
+// TRADE TAB — MARKET SEARCH
+// ═══════════════════════════════════════════════════════
+async function searchKalshi() {
+  const q = el('mkt-search').value.trim();
+  if (!q) return;
+  const out = el('mkt-results');
+  out.innerHTML = '<div class="fs9 cd3 pulse">Searching Kalshi markets...</div>';
+
+  try {
+    const d = await bridgeGet('/search?q=' + encodeURIComponent(q));
+    kalshiMarkets = d.markets;
+    if (!d.count) { out.innerHTML = '<div class="fs9 cd3">No markets found for "' + q + '"</div>'; return; }
+
+    out.innerHTML = `<div class="fs8 cd3 mb6">${d.count} markets found</div>` +
+      d.markets.map(m => {
+        const yesPct = m.last_price || m.yes_bid || '—';
+        const noPct = m.last_price ? (100 - m.last_price) : (m.no_bid || '—');
+        return `<div class="mkt-card ${selectedTicker===m.ticker?'selected':''}" onclick="selectMarket('${m.ticker}')">
+          <div class="flex-b">
+            <div style="flex:1;min-width:0">
+              <div class="fs10 fw7" style="word-break:break-word">${m.title}</div>
+              <div class="fs8 cd3 mt6">${m.ticker}</div>
+            </div>
+            <div class="tr" style="flex-shrink:0;padding-left:12px">
+              <div class="flex gap8">
+                <div><div class="fs8 cg">YES</div><div class="fs12 fw8">${yesPct}¢</div></div>
+                <div><div class="fs8 cr">NO</div><div class="fs12 fw8">${noPct}¢</div></div>
+              </div>
+              <div class="fs8 cd3 mt6">Vol: ${m.volume || 0}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+  } catch(e) {
+    out.innerHTML = `<div class="cd cd-r fs10 cr">${e.message}</div>`;
+  }
+}
+
+async function quickSearchPlayers() {
+  el('mkt-search').value = 'NBAP';
+  const out = el('mkt-results');
+  out.innerHTML = '<div class="fs9 cd3 pulse">Fetching NBA player props...</div>';
+  try {
+    const d = await bridgeGet('/search?series=NBAP&limit=200');
+    kalshiMarkets = d.markets;
+    if (!d.count) { out.innerHTML = '<div class="fs9 cd3">No open NBA player prop markets</div>'; return; }
+    out.innerHTML = `<div class="fs8 cd3 mb6">${d.count} player prop markets</div>` +
+      d.markets.map(m => {
+        const yesPct = m.last_price || m.yes_bid || '—';
+        const noPct = m.last_price ? (100 - m.last_price) : (m.no_bid || '—');
+        return `<div class="mkt-card" onclick="selectMarket('${m.ticker}')">
+          <div class="flex-b">
+            <div style="flex:1;min-width:0">
+              <div class="fs10 fw7">${m.title}</div>
+              <div class="fs8 cd3 mt6">${m.ticker}</div>
+            </div>
+            <div class="tr" style="flex-shrink:0;padding-left:12px">
+              <div class="flex gap8">
+                <div><div class="fs8 cg">YES</div><div class="fs12 fw8">${yesPct}¢</div></div>
+                <div><div class="fs8 cr">NO</div><div class="fs12 fw8">${noPct}¢</div></div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+  } catch(e) {
+    out.innerHTML = `<div class="cd cd-r fs10 cr">${e.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// TRADE TAB — ORDERBOOK + ORDER PLACEMENT
+// ═══════════════════════════════════════════════════════
+async function selectMarket(ticker) {
+  selectedTicker = ticker;
+  el('trade-detail').style.display = 'block';
+  const tes = el('trade-empty-state'); if(tes) tes.style.display='none';
+  const mkt = kalshiMarkets.find(m => m.ticker === ticker);
+  el('ob-title').textContent = mkt?.title || ticker;
+  el('ob-ticker').textContent = ticker;
+
+  // Highlight selected in search results
+  document.querySelectorAll('.mkt-card').forEach(c => c.classList.remove('selected'));
+  event?.target?.closest('.mkt-card')?.classList.add('selected');
+
+  await refreshOrderbook();
+
+  // Pre-fill trade form with best NO price
+  el('trade-side').value = 'no';
+  updateTradePreview();
+}
+
+async function loadDirectTicker() {
+  const ticker = el('direct-ticker').value.trim().toUpperCase();
+  if (!ticker) return;
+  try {
+    const mkt = await bridgeGet('/market/' + ticker);
+    kalshiMarkets = [mkt];
+    selectedTicker = ticker;
+    el('trade-detail').style.display = 'block';
+  const tes = el('trade-empty-state'); if(tes) tes.style.display='none';
+    el('ob-title').textContent = mkt.title || ticker;
+    el('ob-ticker').textContent = ticker;
+    el('trade-side').value = 'no';
+    updateTradePreview();
+    await refreshOrderbook();
+  } catch(e) {
+    alert('Market not found: ' + ticker);
+  }
+}
+
+async function refreshOrderbook() {
+  if (!selectedTicker) return;
+  const disp = el('ob-display');
+  disp.innerHTML = '<div class="fs9 cd3 pulse tc" style="grid-column:span 2">Loading orderbook...</div>';
+
+  try {
+    const d = await bridgeGet('/orderbook/' + selectedTicker);
+
+    let yesHTML = '<div class="ob-hdr">YES BIDS (Over)</div>';
+    if (d.yes?.length) {
+      d.yes.forEach(lv => {
+        const w = Math.min(lv.qty * 2, 100);
+        yesHTML += `<div class="ob-row ob-yes">
+          <div class="flex-b"><span class="cg fw7">${lv.price}¢</span><span class="cd2">${lv.qty} contracts</span></div>
+          <div><div class="bar"><div class="bar-f" style="width:${w}%;background:var(--g)"></div></div></div>
+        </div>`;
+      });
+    } else { yesHTML += '<div class="fs9 cd3" style="padding:8px">No YES bids</div>'; }
+
+    let noHTML = '<div class="ob-hdr">NO BIDS (Under)</div>';
+    if (d.no?.length) {
+      d.no.forEach(lv => {
+        const w = Math.min(lv.qty * 2, 100);
+        noHTML += `<div class="ob-row ob-no">
+          <div class="flex-b"><span class="cr fw7">${lv.price}¢</span><span class="cd2">${lv.qty} contracts</span></div>
+          <div><div class="bar"><div class="bar-f" style="width:${w}%;background:var(--r)"></div></div></div>
+        </div>`;
+      });
+    } else { noHTML += '<div class="fs9 cd3" style="padding:8px">No NO bids</div>'; }
+
+    disp.innerHTML = `<div>${yesHTML}</div><div>${noHTML}</div>`;
+
+    // Auto-fill price from best ask
+    if (d.no?.length) el('trade-price').value = d.no[0].price;
+    else if (d.yes?.length) el('trade-price').value = 100 - d.yes[0].price;
+
+  } catch(e) {
+    disp.innerHTML = `<div class="cd-r fs9 cr" style="grid-column:span 2;padding:8px">${e.message}</div>`;
+  }
+}
+
+function updateTradePreview() {
+  const side = el('trade-side').value;
+  const price = parseInt(el('trade-price').value) || 0;
+  const count = parseInt(el('trade-count').value) || 0;
+  const prev = el('trade-preview');
+
+  if (!price || !count) {
+    prev.innerHTML = '<div class="fs9 cd3 tc">Enter price and contracts to see preview</div>';
+    return;
+  }
+
+  const cost = (price * count) / 100; // dollars
+  const payout = count; // $1 per contract on win
+  const profit = payout - cost;
+  const roi = ((profit / cost) * 100);
+
+  prev.innerHTML = `
+    <div class="g4">
+      <div><div class="st-l">SIDE</div><div class="fs12 fw8" style="color:${side==='no'?'var(--r)':'var(--g)'}">${side.toUpperCase()}</div></div>
+      <div><div class="st-l">COST</div><div class="fs12 fw8">$${cost.toFixed(2)}</div></div>
+      <div><div class="st-l">IF WIN</div><div class="fs12 fw8 cg">+$${profit.toFixed(2)}</div></div>
+      <div><div class="st-l">ROI</div><div class="fs12 fw8 ck">${roi.toFixed(0)}%</div></div>
+    </div>
+    <div class="fs8 cd3 mt6">${count} contracts × ${price}¢ ${side} on ${selectedTicker || '—'}</div>`;
+}
+
+function quickSize(dollars) {
+  const price = parseInt(el('trade-price').value) || 0;
+  if (!price) { el('trade-log').innerHTML = '<div class="cd cd-r fs10 cr">Set a price first</div>'; return; }
+  const contracts = Math.max(1, Math.round((dollars * 100) / price));
+  el('trade-count').value = contracts;
+  updateTradePreview();
+}
+
+let pendingOrder = null;
+
+function submitTrade() {
+  if (!selectedTicker) return;
+  const side = el('trade-side').value;
+  const price = parseInt(el('trade-price').value);
+  const count = parseInt(el('trade-count').value);
+
+  if (!price || !count) {
+    el('trade-log').innerHTML = '<div class="cd cd-r fs10 cr">Enter price and contracts</div>';
+    return;
+  }
+
+  const cost = (price * count / 100).toFixed(2);
+  const payout = count;
+  const profit = (payout - parseFloat(cost)).toFixed(2);
+  const mkt = kalshiMarkets.find(m => m.ticker === selectedTicker);
+
+  pendingOrder = { ticker: selectedTicker, side, price, count };
+
+  el('modal-details').innerHTML = `
+    <div class="flex-b mb8">
+      <div class="fs9 cd3">MARKET</div>
+      <div class="fs9 fw7" style="text-align:right;max-width:200px;word-break:break-word">${mkt?.title || selectedTicker}</div>
+    </div>
+    <div class="flex-b mb8">
+      <div class="fs9 cd3">TICKER</div>
+      <div class="fs8 cd2">${selectedTicker}</div>
+    </div>
+    <div style="height:1px;background:var(--bd);margin:10px 0"></div>
+    <div class="g2 mt8" style="gap:8px">
+      <div style="background:${side==='no'?'var(--rb)':'var(--gb)'};border-radius:8px;padding:10px;text-align:center">
+        <div class="fs8 cd3">SIDE</div>
+        <div class="fs13 fw8" style="color:${side==='no'?'var(--r)':'var(--g)'}">${side.toUpperCase()}</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+        <div class="fs8 cd3">PRICE</div>
+        <div class="fs13 fw8">${price}¢</div>
+      </div>
+    </div>
+    <div class="g3 mt8" style="gap:8px">
+      <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center">
+        <div class="fs8 cd3">COST</div>
+        <div class="fs12 fw8 cr">$${cost}</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:8px;text-align:center">
+        <div class="fs8 cd3">CONTRACTS</div>
+        <div class="fs12 fw8">${count}</div>
+      </div>
+      <div style="background:var(--gb);border-radius:8px;padding:8px;text-align:center">
+        <div class="fs8 cd3">IF WIN</div>
+        <div class="fs12 fw8 cg">+$${profit}</div>
+      </div>
+    </div>`;
+
+  const modal = el('confirm-modal');
+  modal.style.display = 'flex';
+}
+
+function closeModal() {
+  el('confirm-modal').style.display = 'none';
+  pendingOrder = null;
+}
+
+async function confirmTrade() {
+  if (!pendingOrder) return;
+  closeModal();
+
+  const btn = el('trade-submit-btn');
+  const log = el('trade-log');
+  btn.textContent = '⏳ SENDING...';
+  btn.style.pointerEvents = 'none';
+  log.innerHTML = '<div class="cd fs10 pulse">⏳ Placing order...</div>';
+
+  try {
+    const result = await bridgePost('/place_bet', pendingOrder);
+    if (result.status === 'success') {
+      log.innerHTML = `
+        <div class="cd cd-g">
+          <div class="fs12 fw8 cg mb6">✅ Order Placed!</div>
+          <div class="fs8 cd3">Order ID: ${result.order_id}</div>
+          <div class="fs8 cd3 mt4">Ticker: ${pendingOrder.ticker}</div>
+          <div class="fs8 cd3 mt4">${pendingOrder.side.toUpperCase()} ${pendingOrder.count} contracts @ ${pendingOrder.price}¢</div>
+        </div>`;
+      checkBridge();
+      refreshOrderbook();
+      setTimeout(() => loadOrders(), 1000);
+    } else {
+      log.innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">❌ Order Failed</div><div class="fs9 cd3 mt6">${result.message}</div></div>`;
+    }
+  } catch(e) {
+    log.innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">❌ Error</div><div class="fs9 cd3 mt6">${e.message}</div></div>`;
+  }
+
+  btn.textContent = 'PLACE ORDER';
+  btn.style.pointerEvents = 'auto';
+  pendingOrder = null;
+}
+
+// ═══════════════════════════════════════════════════════
+// TRADE TAB — POSITIONS & ORDERS
+// ═══════════════════════════════════════════════════════
+async function loadPositions() {
+  const out = el('positions-list');
+  out.innerHTML = '<div class="fs9 cd3 pulse">Loading...</div>';
+  try {
+    const d = await bridgeGet('/positions');
+    if (!d.count) { out.innerHTML = '<div class="fs9 cd3 tc">No open positions</div>'; return; }
+    out.innerHTML = d.positions.map(p => `
+      <div class="pos-card">
+        <div class="fs9 fw7" style="word-break:break-all">${p.ticker}</div>
+        <div class="flex gap8 mt6 fs8">
+          ${p.yes_count ? `<span class="cg">YES: ${p.yes_count} @ ${p.avg_yes_price}¢</span>` : ''}
+          ${p.no_count ? `<span class="cr">NO: ${p.no_count} @ ${p.avg_no_price}¢</span>` : ''}
+        </div>
+      </div>`).join('');
+  } catch(e) { out.innerHTML = `<div class="fs9 cr">${e.message}</div>`; }
+}
+
+async function loadOrders() {
+  const out = el('orders-list');
+  out.innerHTML = '<div class="fs9 cd3 pulse">Loading...</div>';
+  try {
+    const d = await bridgeGet('/orders');
+    if (!d.count) { out.innerHTML = '<div class="fs9 cd3 tc">No recent orders</div>'; return; }
+    out.innerHTML = d.orders.slice(0, 15).map(o => {
+      const sc = o.status === 'executed' ? 'cg' : o.status === 'resting' ? 'cy' : 'cd3';
+      const canCancel = o.status === 'resting';
+      return `<div class="pos-card">
+        <div class="flex-b">
+          <div class="fs9 fw7">${o.side?.toUpperCase()} ${o.count || '—'}x @ ${o.price || '—'}¢</div>
+          <div class="fs9 ${sc} fw7">${o.status?.toUpperCase()}</div>
+        </div>
+        <div class="fs8 cd3 mt4" style="word-break:break-all">${o.ticker}</div>
+        <div class="fs8 cd3 mt2">${new Date(o.created_time).toLocaleString()}</div>
+        ${canCancel ? `<button class="btn-d mt6" style="width:100%;font-size:10px" onclick="cancelOrder('${o.order_id}')">✕ CANCEL ORDER</button>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) { out.innerHTML = `<div class="fs9 cr">${e.message}</div>`; }
+}
+
+// ═══════════════════════════════════════════════════════
+// PROPS TAB — KALSHI LINE FETCHER
+// ═══════════════════════════════════════════════════════
+async function fetchKalshiProps() {
+  if (!tracked.length) return;
+  if (!bridgeOK) { await checkBridge(); if (!bridgeOK) { alert('Bridge offline — start bridge.py'); return; } }
+
+  // Search for NBAP markets
+  try {
+    const d = await bridgeGet('/search?series=NBAP&limit=200');
+    if (!d.count) return;
+
+    // Try to match player names to Kalshi tickers
+    tracked.forEach(p => {
+      const lastName = p.name.split(' ').pop().toUpperCase();
+      const match = d.markets.find(m =>
+        m.ticker.includes(lastName) && m.ticker.includes('PTS')
+      );
+      if (match) {
+        // Extract line from ticker: NBAP-26MAR17-MAXEY-25.5-PTS → 25.5
+        const parts = match.ticker.split('-');
+        const lineIdx = parts.findIndex(x => x === 'PTS') - 1;
+        if (lineIdx >= 0) {
+          const kalshiLine = parseFloat(parts[lineIdx]);
+          if (!isNaN(kalshiLine)) {
+            p._kalshiLine = kalshiLine;
+            p._kalshiTicker = match.ticker;
+            p._kalshiYes = match.yes_bid || match.last_price;
+            p._kalshiNo = match.no_bid || (match.last_price ? 100 - match.last_price : null);
+          }
+        }
+      }
+    });
+    renderProps();
+  } catch(e) { console.error('Kalshi prop fetch error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════
+// MODEL A — EFFICIENCY (45%) — BACKTEST-PROVEN
+// ═══════════════════════════════════════════════════════
+function modelA(h, a, g) {
+  const hT = D.teams[h] || {}, aT = D.teams[a] || {};
+  const log = [];
+
+  // ── Net rating: 70% season, 30% L10 blend ──
+  const hNetSzn = hT.net || ((hT.ortg||AVG_ORTG) - (hT.drtg||AVG_DRTG));
+  const aNSetSzn = aT.net || ((aT.ortg||AVG_ORTG) - (aT.drtg||AVG_DRTG));
+  const hL10net = hT.l10ptsFor > 0 ? (hT.l10ptsFor - (hT.l10ptsAgainst || (hT.ptsAgainst||AVG_DRTG))) : hNetSzn;
+  const aL10net = aT.l10ptsFor > 0 ? (aT.l10ptsFor - (aT.l10ptsAgainst || (aT.ptsAgainst||AVG_DRTG))) : aNSetSzn;
+  const hN = hNetSzn * 0.70 + hL10net * 0.30;
+  const aN = aNSetSzn * 0.70 + aL10net * 0.30;
+  const effEdge = (hN - aN) * 0.028;
+  log.push({lbl:'Net rating (70% szn + 30% L10)', val:`${h}: ${hN>0?'+':''}${hN.toFixed(1)} | ${a}: ${aN>0?'+':''}${aN.toFixed(1)} | diff ${(hN-aN).toFixed(1)} → ${(effEdge*100).toFixed(1)}%`});
+
+  // ── Injuries — OUT + GTD tiered by PPG ──
+  const hInj = D.injuries[h] || [], aInj = D.injuries[a] || [];
+  function injPoints(list) {
+    let v = 0;
+    list.forEach(inj => {
+      const player = D.players.find(p => p.name === inj.p);
+      const ppg = player?.szn || 0;
+      const isOut = inj.s === 'OUT';
+      const isGTD = inj.s === 'GTD';
+      const mult = isOut ? 1.0 : isGTD ? 0.40 : 0; // GTD = 40% of OUT impact
+      if (mult === 0) return;
+      if (ppg >= 25 || inj.star) v += 0.035 * mult;
+      else if (ppg >= 18) v += 0.025 * mult;
+      else if (ppg >= 12) v += 0.015 * mult;
+      else if (ppg >= 6) v += 0.008 * mult;
+      else v += 0.003 * mult;
+    });
+    return v;
+  }
+  const hInjV = injPoints(hInj), aInjV = injPoints(aInj);
+  const injAdj = aInjV - hInjV;
+  const fmt = (list, team) => list.filter(x=>x.s==='OUT'||x.s==='GTD').map(x => {
+    const pl = D.players.find(p=>p.name===x.p);
+    return `${x.p}${pl?.szn?` (${pl.szn}ppg)`:''}${x.s==='GTD'?' GTD':''}`;
+  }).join(', ') || 'none';
+  log.push({lbl:'Injuries OUT+GTD', val:`${h}: -${(hInjV*100).toFixed(1)}% [${fmt(hInj,h)}] | ${a}: -${(aInjV*100).toFixed(1)}% [${fmt(aInj,a)}] → net ${(injAdj*100).toFixed(1)}%`});
+
+  // ── Rest — asymmetric B2B (away B2B is harder) ──
+  let restAdj = 0;
+  const hRest = g?.hRest ?? 1, aRest = g?.aRest ?? 1;
+  if (hRest === 0) restAdj -= 0.018;       // Home B2B: -1.8%
+  if (aRest === 0) restAdj += 0.038;       // Away B2B: +3.8% (harder to play away tired)
+  if (hRest >= 3) restAdj += 0.010;        // Well-rested home
+  if (aRest >= 3) restAdj -= 0.010;        // Well-rested away
+  // 3-in-4 fatigue
+  const hG4 = hT.games_last4 || 0, aG4 = aT.games_last4 || 0;
+  if (hG4 >= 3) restAdj -= 0.022;
+  if (aG4 >= 3) restAdj += 0.022;
+  const h3in4 = hG4 >= 3 ? ' 3-in-4' : '';
+  const a3in4 = aG4 >= 3 ? ' 3-in-4' : '';
+  log.push({lbl:'Rest/B2B', val:`${h}: ${hRest===0?'B2B':'rest '+hRest+'d'}${h3in4} | ${a}: ${aRest===0?'B2B':'rest '+aRest+'d'}${a3in4} → ${(restAdj*100).toFixed(1)}%`});
+
+  // ── Travel + Altitude ──
+  let travelAdj = 0;
+  if (g?.aTravel) travelAdj += 0.012;
+  if (g?.hTravel) travelAdj -= 0.012;
+  let altAdj = 0;
+  if (h === 'DEN') altAdj = 0.030;
+  else if (h === 'UTA') altAdj = 0.020;
+  if (altAdj) log.push({lbl:'Altitude', val:`${h} at elevation → +${(altAdj*100).toFixed(0)}%`});
+  if (travelAdj) log.push({lbl:'Travel', val:`Coast-to-coast → ${(travelAdj*100).toFixed(1)}%`});
+  if (!altAdj && !travelAdj) log.push({lbl:'Travel/Altitude', val:'None'});
+
+  // ── HCA — uses both teams home/away records ──
+  let hca = 0.025;
+  let hcaLog = `+2.5% default`;
+  const hHwp = hT.hw > 0 ? hT.hw / Math.max(1, hT.hw + hT.hl) : null;
+  const hAwp = hT.aw > 0 ? hT.aw / Math.max(1, hT.aw + hT.al) : null;
+  const aAwp = aT.aw > 0 ? aT.aw / Math.max(1, aT.aw + aT.al) : null;
+  if (hHwp !== null && hAwp !== null) {
+    // Home team's HCA ability
+    const hcaAbility = Math.max(0, Math.min(0.05, (hHwp - hAwp) * 0.5 + 0.02));
+    // Away team's road performance (strong road team = reduce HCA)
+    const awayRoadPenalty = aAwp !== null ? Math.max(0, (0.45 - aAwp) * 0.15) : 0;
+    hca = hcaAbility + awayRoadPenalty;
+    hca = Math.max(0.01, Math.min(0.06, hca));
+    hcaLog = `${h} home ${(hHwp*100).toFixed(0)}%/away ${(hAwp*100).toFixed(0)}%${aAwp!==null?' | '+a+' road '+(aAwp*100).toFixed(0)+'%':''} → +${(hca*100).toFixed(1)}%`;
+  }
+  log.push({lbl:'Home court', val:hcaLog});
+
+  let prob = 0.5 + effEdge + hca + injAdj + restAdj + travelAdj + altAdj;
+  prob = clamp(prob);
+  log.push({lbl:'FINAL', val:`${(prob*100).toFixed(1)}% ${h} win`, bold:true});
+  return { prob, log };
+}
+
+// ═══════════════════════════════════════════════════════
+// MODEL B — MOMENTUM (30%)
+// ═══════════════════════════════════════════════════════
+function modelB(h, a, g) {
+  const hT = D.teams[h] || {}, aT = D.teams[a] || {};
+  const log = [];
+
+  // ── L10 scoring output vs season (offensive heat) ──
+  const hSznPts = hT.ptsFor || 110, aSznPts = aT.ptsFor || 110;
+  const hL10Pts = hT.l10ptsFor || hSznPts, aL10Pts = aT.l10ptsFor || aSznPts;
+  const hOffHeat = hL10Pts - hSznPts;  // positive = running hot
+  const aOffHeat = aL10Pts - aSznPts;
+  const offHeatAdj = (hOffHeat - aOffHeat) * 0.004;
+  log.push({lbl:'Offensive heat (L10 vs szn)', val:`${h}: L10 ${hL10Pts.toFixed(1)} vs szn ${hSznPts.toFixed(1)} (${hOffHeat>0?'+':''}${hOffHeat.toFixed(1)}) | ${a}: L10 ${aL10Pts.toFixed(1)} vs szn ${aSznPts.toFixed(1)} (${aOffHeat>0?'+':''}${aOffHeat.toFixed(1)}) → ${(offHeatAdj*100).toFixed(1)}%`});
+
+  // ── Trajectory: L5 vs L10 pts (improving or declining?) ──
+  const hL5pts = hT.l5ptsFor || hL10Pts, aL5pts = aT.l5ptsFor || aL10Pts;
+  const hTraj = hL5pts - hL10Pts;  // positive = accelerating recently
+  const aTraj = aL5pts - aL10Pts;
+  const trajAdj = (hTraj - aTraj) * 0.005;
+  log.push({lbl:'Trajectory (L5 vs L10)', val:`${h}: L5 ${hL5pts.toFixed(1)} vs L10 ${hL10Pts.toFixed(1)} (${hTraj>0?'↑':'↓'}${Math.abs(hTraj).toFixed(1)}) | ${a}: L5 ${aL5pts.toFixed(1)} vs L10 ${aL10Pts.toFixed(1)} (${aTraj>0?'↑':'↓'}${Math.abs(aTraj).toFixed(1)}) → ${(trajAdj*100).toFixed(1)}%`});
+
+  // ── L10 record — reduced weight, quality signal only ──
+  const hL10wp = (hT.l10w||5) / Math.max(1, (hT.l10w||5) + (hT.l10l||5));
+  const aL10wp = (aT.l10w||5) / Math.max(1, (aT.l10w||5) + (aT.l10l||5));
+  const l10Edge = (hL10wp - aL10wp) * 0.25;  // reduced from 0.65
+  log.push({lbl:'L10 record', val:`${h}: ${hT.l10w||'?'}-${hT.l10l||'?'} (${(hL10wp*100).toFixed(0)}%) | ${a}: ${aT.l10w||'?'}-${aT.l10l||'?'} (${(aL10wp*100).toFixed(0)}%) → ${(l10Edge*100).toFixed(1)}%`});
+
+  // ── Venue-specific form (home W% vs away W%) ──
+  let venueAdj = 0, venueLog = 'No venue data';
+  if (hT.hw != null && aT.aw != null) {
+    const hHwp2 = hT.hw / Math.max(1, hT.hw + hT.hl);
+    const aAwp2 = aT.aw / Math.max(1, aT.aw + aT.al);
+    venueAdj = (hHwp2 - aAwp2) * 0.18;  // how good is home team at home vs how good is away team on the road
+    venueLog = `${h} home ${(hHwp2*100).toFixed(0)}% | ${a} away ${(aAwp2*100).toFixed(0)}% → ${(venueAdj*100).toFixed(1)}%`;
+  }
+  log.push({lbl:'Venue form', val:venueLog});
+
+  // ── Streak — capped low, mean-reversion aware ──
+  const hStrk = hT.streak || 0, aStrk = aT.streak || 0;
+  // Cap at ±2% max, with decay for long streaks (mean reversion)
+  const streakVal = (s) => {
+    const abs = Math.abs(s), sign = Math.sign(s);
+    if (abs >= 7) return sign * 0.020;
+    if (abs >= 5) return sign * 0.015;
+    if (abs >= 3) return sign * 0.010;
+    if (abs >= 2) return sign * 0.005;
+    return 0;
+  };
+  const streakAdj = streakVal(hStrk) - streakVal(aStrk);
+  log.push({lbl:'Streak (capped ±2%)', val:`${h}: ${hStrk>0?'W':'L'}${Math.abs(hStrk)} | ${a}: ${aStrk>0?'W':'L'}${Math.abs(aStrk)} → ${(streakAdj*100).toFixed(1)}%`});
+
+  // ── Opponent-adjusted form ──
+  const hOppAdj = hT.opp_adj_form || 0, aOppAdj = aT.opp_adj_form || 0;
+  const oppFormAdj = (hOppAdj - aOppAdj) * 0.004;
+  log.push({lbl:'Opp-adjusted form', val:`${h} avg opp net: ${hOppAdj>0?'+':''}${hOppAdj} | ${a}: ${aOppAdj>0?'+':''}${aOppAdj} → ${(oppFormAdj*100).toFixed(1)}%`});
+
+  let prob = 0.5 + offHeatAdj + trajAdj + l10Edge + venueAdj + streakAdj + oppFormAdj;
+  prob = clamp(prob);
+  log.push({lbl:'FINAL', val:`${(prob*100).toFixed(1)}% ${h} win`, bold:true});
+  return { prob, log };
+}
+
+// ═══════════════════════════════════════════════════════
+// MODEL C — VEGAS-FIRST / MARKET INTELLIGENCE (15%)
+// ═══════════════════════════════════════════════════════
+function modelC(h, a, g) {
+  const hT = D.teams[h] || {}, aT = D.teams[a] || {};
+  const log = [];
+
+  // ── Vegas: primary signal when available ──
+  // Vegas lines aggregate enormous amounts of info — injury reports,
+  // lineup data, public money, sharp action. When loaded, it IS the model.
+  const vo = vegasOdds[h] || vegasOdds[a];
+  let vegasProb = null;
+  if (vo) {
+    vegasProb = vegasOdds[h] ? vo.hProb / 100 : (1 - vo.aProb / 100);
+    // De-vig: lines have ~4-5% juice baked in, adjust back toward 50
+    const deVig = (vegasProb - 0.5) * 0.92;
+    vegasProb = 0.5 + deVig;
+    log.push({lbl:'Vegas (de-vigged)', val:`${h} implied ${(vo.hProb||100-vo.aProb).toFixed(0)}% → de-vigged ${(vegasProb*100).toFixed(1)}% — PRIMARY SIGNAL`});
+  }
+
+  // ── Fallback: Pythagorean win expectancy (orthogonal to A/B) ──
+  // Uses points scored/allowed to estimate true team quality
+  // More stable than net rating for mismatched pace teams
+  const hPF = hT.ptsFor || 110, hPA = hT.ptsAgainst || 110;
+  const aPF = aT.ptsFor || 110, aPA = aT.ptsAgainst || 110;
+  const exp = 13.91; // NBA Pythagorean exponent
+  const hPyth = Math.pow(hPF, exp) / (Math.pow(hPF, exp) + Math.pow(hPA, exp));
+  const aPyth = Math.pow(aPF, exp) / (Math.pow(aPF, exp) + Math.pow(aPA, exp));
+  const pythEdge = (hPyth - aPyth) * 0.55;
+  log.push({lbl:'Pythagorean strength', val:`${h}: ${(hPyth*100).toFixed(1)}% | ${a}: ${(aPyth*100).toFixed(1)}% → diff ${(pythEdge*100).toFixed(1)}%`});
+
+  // ── Point differential consistency (variance signal) ──
+  // Teams that win/lose by large margins are more reliable predictions
+  // Use season avg margin as proxy for consistency
+  const hMargin = hPF - hPA;
+  const aMargin = aPF - aPA;
+  const marginEdge = (hMargin - aMargin) * 0.006;
+  log.push({lbl:'Avg point margin', val:`${h}: ${hMargin>0?'+':''}${hMargin.toFixed(1)} | ${a}: ${aMargin>0?'+':''}${aMargin.toFixed(1)} → ${(marginEdge*100).toFixed(1)}%`});
+
+  // ── Pace interaction: fast games help better teams ──
+  const hNet = hT.net || 0, aNet = aT.net || 0;
+  const hPace = hT.pace || AVG_PACE, aPace = aT.pace || AVG_PACE;
+  const avgPace = (hPace + aPace) / 2;
+  const paceEffect = (avgPace - AVG_PACE) / AVG_PACE;
+  const paceAdj = (hNet - aNet) * paceEffect * 0.006;
+  log.push({lbl:'Pace amplifier', val:`Game pace ~${avgPace.toFixed(1)} (${paceEffect>0.01?'fast':paceEffect<-0.01?'slow':'avg'}) × net diff ${(hNet-aNet).toFixed(1)} → ${(paceAdj*100).toFixed(1)}%`});
+
+  let prob;
+  if (vegasProb !== null) {
+    // Vegas loaded: Vegas drives 75%, Pythagorean + pace are small corrections
+    prob = vegasProb * 0.75 + (0.5 + pythEdge + marginEdge + paceAdj) * 0.25;
+    log.push({lbl:'Mode', val:'VEGAS-ANCHORED (75% Vegas + 25% Pythag)'});
+  } else {
+    // No Vegas: pure Pythagorean + margin + pace
+    prob = 0.5 + pythEdge + marginEdge + paceAdj + 0.025;
+    log.push({lbl:'Mode', val:'PYTHAGOREAN FALLBACK (no Vegas loaded)'});
+  }
+
+  prob = clamp(prob);
+  log.push({lbl:'FINAL', val:`${(prob*100).toFixed(1)}% ${h} win`, bold:true});
+  return { prob, log };
+}
+
+// ═══════════════════════════════════════════════════════
+// TRIPLE MODEL SYSTEM
+// ═══════════════════════════════════════════════════════
+function triModel(h, a, g) {
+  const rA = modelA(h, a, g), rB = modelB(h, a, g), rC = modelC(h, a, g);
+  const avg = rA.prob * modelWeights.a + rB.prob * modelWeights.b + rC.prob * modelWeights.c;
+  const votes = [rA.prob > 0.5, rB.prob > 0.5, rC.prob > 0.5];
+  const agree = votes.filter(v => v === votes[0]).length;
+  const conf = agree === 3 ? (Math.abs(avg - 0.5) > 0.10 ? 'LOCK' : 'HIGH') : agree >= 2 ? 'MED' : 'LOW';
+  return { a: rA.prob, b: rB.prob, c: rC.prob, avg, agree: agree >= 2, votes: agree, conf, logA: rA.log, logB: rB.log, logC: rC.log };
+}
+
+function clamp(v) { return Math.max(0.05, Math.min(0.95, v)); }
+
+function confTag(conf) {
+  const fireSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 80 80"><g fill="none"><path fill="#eb5757" fill-rule="evenodd" d="M40 67.965c11.046 0 20-8.954 20-20V46.76c0-4.42-1.38-8.728-3.95-12.325L40.04 12.02a.05.05 0 0 0-.08 0l-.145.205a9 9 0 0 0-.165 10.223l4.416 6.625A11.5 11.5 0 0 1 46 35.459v1.514c0 5.523-4.477 10-10 10s-10-4.477-10-10V35.46c0-2.273.673-4.495 1.934-6.386l2.15-3.224l-6.134 8.586A21.2 21.2 0 0 0 20 46.76v1.205c0 11.046 8.954 20 20 20" clip-rule="evenodd"/><path fill="#f2c94c" d="M51 36.973v-1.006l.982 1.375A16.2 16.2 0 0 1 55 46.76v1.205c0 8.284-6.716 15-15 15s-15-6.716-15-15v-.794a14.96 14.96 0 0 0 11 4.802c8.284 0 15-6.715 15-15"/></g></svg>';
+  const m = {
+    LOCK: fireSvg + ' LOCK',
+    HIGH: '▲ HIGH',
+    MED: '◆ MED',
+    LOW: '▽ LOW'
+  };
+  const c = {LOCK:'var(--k)', HIGH:'var(--g)', MED:'var(--y)', LOW:'var(--r)'};
+  const bg = {LOCK:'var(--kb)', HIGH:'var(--gb)', MED:'var(--yb)', LOW:'var(--rb)'};
+  const extraClass = conf === 'LOCK' ? ' conf-lock-shimmer' : '';
+  return `<span class="tg${extraClass}" style="background:${bg[conf]};color:${c[conf]};display:inline-flex;align-items:center;gap:3px">${m[conf]}</span>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// SHOW MATH
+// ═══════════════════════════════════════════════════════
+function renderLog(log, label, color) {
+  return `<div style="margin-bottom:8px"><div class="fs9 fw8 ls1 mb6" style="color:${color}">${label}</div>${log.map(l => `<div class="fs9" style="padding:3px 0;color:${l.bold?'var(--t)':'var(--d2)'}${l.bold?';font-weight:700':''}">${l.lbl}: ${l.val}</div>`).join('')}</div>`;
+}
+
+function toggleMath(gid) {
+  const el_ = document.getElementById(`math-${gid}`);
+  if (!el_) return;
+  el_.style.display = el_.style.display === 'none' ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════
+// KELLY
+// ═══════════════════════════════════════════════════════
+function kelly(modelP, marketP, conf) {
+  if (modelP <= marketP) return { pct: 0, bet: 0, edge: 0, raw: 0 };
+  const edge = modelP - marketP;
+  const k = edge / (1 - marketP);
+  const frac = parseFloat(el('kelly-frac').value) || 0.5;
+  let adj = k * frac;
+  if (conf === 'LOW') adj *= 0.25;
+  else if (conf === 'MED') adj *= 0.6;
+  else if (conf === 'HIGH') adj *= 0.85;
+  adj = Math.min(adj, 0.10);
+  const br = parseFloat(el('bankroll').value) || 100;
+  return { pct: adj * 100, bet: Math.round(br * adj * 100) / 100, edge: edge * 100, raw: k * 100 };
+}
+
+// ═══════════════════════════════════════════════════════
+// PROPS PROJECTION V2
+// ═══════════════════════════════════════════════════════
+function projPts(p) {
+  const oD = D.teams[p.opp]?.drtg || AVG_DRTG;
+  const tP = D.teams[p.team]?.pace || AVG_PACE;
+  const oP = D.teams[p.opp]?.pace || AVG_PACE;
+  const pace = (tP + oP) / 2;
+
+  const l10 = p.l10 || p.szn;  // now decay-weighted from bridge
+  const l5 = p.l5 || p.szn;
+  const szn = p.szn || 0;
+
+  // L5 weighted most — recent form is strongest predictor
+  let base = l5 * 0.50 + l10 * 0.30 + szn * 0.20;
+
+  // Minutes adjustment — only penalize if playing fewer minutes than normal
+  // Don't boost high-minute players (already reflected in their scoring avg)
+  if (p.min > 0 && p.min < 28) {
+    const minRatio = Math.max(0.7, p.min / 30);
+    base *= minRatio;
+  }
+
+  // Usage rate adjustment — high usage players get more opportunities
+  // avgEstimatedPossessions: league avg ~20, range roughly 8-30
+  // Scale: player usage vs league avg 20, capped at ±15%
+  if (p.usg > 0) {
+    const usgRatio = Math.min(1.15, Math.max(0.85, p.usg / 20));
+    base *= usgRatio;
+  }
+  // B2B penalty — players score ~11% less on back-to-backs
+  const g = D.games.find(x => x.h === p.team || x.a === p.team);
+  const isHome = g?.h === p.team;
+  const onB2B = isHome ? (g?.hRest === 0) : (g?.aRest === 0);
+  if (onB2B) base *= 0.89;
+
+  // oppD adjustment — softer multiplier
+  const oppDAdj = ((oD - AVG_DRTG) / AVG_DRTG) * 0.4;
+  base *= (1 + oppDAdj);
+
+  // Pace adjustment
+  base *= (pace / AVG_PACE);
+
+  // Home/away — proportional not flat
+  if (isHome) base *= 1.025; else base *= 0.975;
+
+  // Blowout risk — tiered
+  const tN = D.teams[p.team]?.net || 0, oN = D.teams[p.opp]?.net || 0;
+  const netGap = Math.abs(tN - oN);
+  if (netGap > 20) base *= 0.90;
+  else if (netGap > 12) base *= 0.94;
+  else if (netGap > 7) base *= 0.97;
+
+  // Star-out usage boost — if team's top scorer is OUT, bump remaining players
+  const teamInjuries = D.injuries[p.team] || [];
+  const starOut = teamInjuries.some(x => x.s === 'OUT' && x.star);
+  const starterOut = teamInjuries.filter(x => x.s === 'OUT' && x.starter).length;
+  if (starOut) base *= 1.08;
+  else if (starterOut >= 2) base *= 1.05;
+  else if (starterOut === 1) base *= 1.03;
+
+  return Math.round(base * 10) / 10;
+}
+
+function getStreakBadge(p) {
+  if (!p.note) return '';
+  const match = p.note.match(/L5: ([\d,]+)/);
+  if (!match) return '';
+  const games = match[1].split(',').map(Number);
+  if (games.length < 3) return '';
+  
+  // Check last 3 games trend
+  const last3 = games.slice(-3);
+  const allUp = last3[0] < last3[1] && last3[1] < last3[2];
+  const allDown = last3[0] > last3[1] && last3[1] > last3[2];
+  const bigUp = last3[2] > last3[0] * 1.3; // 30% higher than 3 games ago
+  const bigDown = last3[2] < last3[0] * 0.7; // 30% lower than 3 games ago
+
+  if (allUp && bigUp) return '<span class="tg" style="background:rgba(78,237,181,0.15);color:var(--g)">🔥 HOT</span>';
+  if (allDown && bigDown) return '<span class="tg" style="background:rgba(255,100,100,0.15);color:var(--r)">❄️ COLD</span>';
+  if (allUp) return '<span class="tg" style="background:rgba(78,237,181,0.08);color:var(--g)">↑ TRENDING</span>';
+  if (allDown) return '<span class="tg" style="background:rgba(255,100,100,0.08);color:var(--r)">↓ FADING</span>';
+  return '';
+}
+
+function getMinTrendBadge(p) {
+  if (!p.min || !p.szn) return '';
+  const minDiff = p.min - (p.szn / p.szn * p.min); // L10 avg min
+  // Compare L10 avg minutes vs what we'd expect from season role
+  // If min field (L10 avg) is significantly lower than typical starter load
+  const seasonMin = p.min; // this is already L10 avg from bridge
+  // We need to detect if recent minutes are trending down
+  // Use the note field L5 scores as proxy — if scoring down AND minutes down
+  if (!p.note) return '';
+  const match = p.note.match(/L5: ([\d,]+)/);
+  if (!match) return '';
+  const l5games = match[1].split(',').map(Number);
+  const l5avg = l5games.reduce((a,b) => a+b, 0) / l5games.length;
+  
+  // If L10 avg minutes < 28 and season avg scoring suggests they should play more
+  if (p.min < 25 && p.szn > 12) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  if (p.min > 0 && p.szn > 0) {
+    const minRatio = p.min / 32;
+    if (minRatio < 0.75 && p.szn > 15) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  }
+  return '';
+}
+
+function getMinTrendBadge(p) {
+  if (!p.min || !p.szn) return '';
+  const minDiff = p.min - (p.szn / p.szn * p.min); // L10 avg min
+  // Compare L10 avg minutes vs what we'd expect from season role
+  // If min field (L10 avg) is significantly lower than typical starter load
+  const seasonMin = p.min; // this is already L10 avg from bridge
+  // We need to detect if recent minutes are trending down
+  // Use the note field L5 scores as proxy — if scoring down AND minutes down
+  if (!p.note) return '';
+  const match = p.note.match(/L5: ([\d,]+)/);
+  if (!match) return '';
+  const l5games = match[1].split(',').map(Number);
+  const l5avg = l5games.reduce((a,b) => a+b, 0) / l5games.length;
+  
+  // If L10 avg minutes < 28 and season avg scoring suggests they should play more
+  if (p.min < 25 && p.szn > 12) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  if (p.min > 0 && p.szn > 0) {
+    const minRatio = p.min / 32;
+    if (minRatio < 0.75 && p.szn > 15) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
+  }
+  return '';
+}
+
+// ═══════════════════════════════════════════════════════
+// DATA LOADER
+// ═══════════════════════════════════════════════════════
+function loadJSON() {
+  const raw = el('json-input').value.trim();
+  if (!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    D = { date: d.date||"", games: d.games||[], teams: d.teams||{}, players: d.players||[], injuries: d.injuries||{} };
+    tracked = D.players.map(p => ({...p}));
+    el('json-input').value = '';
+    el('data-log').innerHTML = `<div class="cd cd-g"><div class="fs10 cg fw7">✓ Data loaded — ${D.games.length} games, ${D.players.length} players, ${Object.keys(D.teams).length} teams</div></div>`;
+    el('data-status').innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"/><path stroke="#fff" stroke-linecap="round" d="M31 31C31 31 29 35 24 35C19 35 17 31 17 31"/><path stroke="#fff" stroke-linecap="round" d="M31 18V22"/><path stroke="#fff" stroke-linecap="round" d="M17 18V22"/></g></svg><span class="cg fw7">${D.date||'Today'} — ${D.games.length} games loaded</span>`;
+    el('data-summary').innerHTML = `<div>Date: <strong class="ck">${D.date||'N/A'}</strong></div><div>Games: <strong class="cp">${D.games.length}</strong></div><div>Teams: <strong class="cp">${Object.keys(D.teams).length}</strong></div><div>Players: <strong class="cp">${D.players.length}</strong></div><div>Injuries: <strong class="cr">${Object.values(D.injuries).flat().length}</strong></div>`;
+    renderAll();
+    logPredictions();
+  } catch(e) { el('data-log').innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">✗ Parse error: ${e.message}</div></div>`; }
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════════
+function renderAll() { renderKalshi(); renderValue(); renderProps(); reCalc(); }
+function reCalc() { D.games.forEach(g => onKInput(g.id)); updateKelly(); }
+
+// ═══════════════════════════════════════════════════════
+// KALSHI TAB
+// ═══════════════════════════════════════════════════════
+function renderKalshi() {
+  if (!D.games.length) { el('kalshi-games').innerHTML = '<div class="empty"><i><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"/><path stroke="#fff" stroke-linecap="round" d="M31 31C31 31 29 35 24 35C19 35 17 31 17 31"/><path stroke="#fff" stroke-linecap="round" d="M31 18V22"/><path stroke="#fff" stroke-linecap="round" d="M17 18V22"/></g></svg></i><div class="fs12 cd2">No games loaded</div></div>'; return; }
+  // Build filter bar
+  const filterBar = `<div class="game-filter-bar">
+    <button class="game-filter-btn ${activeGameFilter===null?'active':''}" onclick="setGameFilter(null)">ALL</button>
+    ${D.games.map(g => `
+      <button class="game-filter-btn ${activeGameFilter===g.id?'active':''}" onclick="setGameFilter('${g.id}')">
+        <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.a)}.png" onerror="this.style.display='none'">
+        ${g.a}
+        <span style="color:var(--d3);font-size:9px">@</span>
+        <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.h)}.png" onerror="this.style.display='none'">
+        ${g.h}
+        <span style="color:var(--d3);font-size:9px">${g.t||''}</span>
+      </button>`).join('')}
+  </div>`;
+
+  const gamesToShow = activeGameFilter ? D.games.filter(g => g.id === activeGameFilter) : D.games;
+  const gamesHtml = gamesToShow.map(g => {
+    const d = triModel(g.h, g.a, g);
+    const kH = g.kH || g.hp || '', kA = g.kA || g.ap || '';
+    const collapsed = kalshiCollapsed[g.id] || false;
+    return `<div class="cd" id="kg-${g.id}" style="margin-bottom:8px;border-radius:10px;overflow:hidden">
+      <div class="game-hdr" onclick="toggleKalshiGame('${g.id}')">
+        <div class="game-vs">
+          <div class="game-team">
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.a)}.png" onerror="this.style.display='none'">
+            <span class="game-team-name">${g.a}</span>
+          </div>
+          <span class="game-at">@</span>
+          <div class="game-team">
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(g.h)}.png" onerror="this.style.display='none'">
+            <span class="game-team-name">${g.h}</span>
+          </div>
+          <div class="game-meta">
+            ${confTag(d.conf)}
+            <span class="fs8 cd3">${d.votes}/3</span>
+          </div>
+        </div>
+        <div class="flex gap8" style="align-items:center">
+          <span class="game-time">${g.t||''} ET</span>
+          <span class="chevron ${collapsed?'':'open'}">▶</span>
+        </div>
+      </div>
+      <div id="kg-body-${g.id}" class="collapsible-body ${collapsed?'':'open'}"><div style="padding:14px">
+        <div class="prob-bar-wrap" style="margin-bottom:14px">
+          <div class="prob-bar-away" style="width:${((1-d.avg)*100).toFixed(1)}%"></div>
+          <div class="prob-bar-home" style="width:${(d.avg*100).toFixed(1)}%"></div>
+        </div>
+        <div class="prob-bar-labels" style="margin-top:-10px;margin-bottom:12px">
+          <span style="color:var(--r)">${g.a} ${((1-d.avg)*100).toFixed(0)}%</span>
+          <span style="color:var(--k)">${(d.avg*100).toFixed(0)}% ${g.h}</span>
+        </div>
+        <div style="margin-bottom:10px">
+          <button class="btn" style="padding:4px 8px;font-size:10px" onclick="event.stopPropagation();toggleMath('${g.id}')">MATH</button>
+        </div>
+        <div id="math-${g.id}" style="display:none;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:10px">
+          ${renderLog(d.logA, 'MODEL A — EFFICIENCY (50%)', 'var(--p)')}
+          ${renderLog(d.logB, 'MODEL B — MOMENTUM (35%)', 'var(--y)')}
+          ${renderLog(d.logC, 'MODEL C — VEGAS/PYTHAG (15%)', 'var(--b)')}
+          <div style="border-top:1px solid var(--bd);padding-top:8px;margin-top:4px">
+            <div class="fs9 fw8">WEIGHTED: A ${(d.a*100).toFixed(1)}% × ${(modelWeights.a).toFixed(2)} + B ${(d.b*100).toFixed(1)}% × ${(modelWeights.b).toFixed(2)} + C ${(d.c*100).toFixed(1)}% × ${(modelWeights.c).toFixed(2)} = <span class="ck count-num" data-target="${(d.avg*100).toFixed(1)}" data-suffix="%">${(d.avg*100).toFixed(1)}%</span> ${g.h}</div>
+          </div>
+        </div>
+        <div class="g2">
+          <div>
+            <div class="fs8 cd3 mb6">${g.a} Kalshi %</div>
+            <input type="number" class="inp tc" id="ki-${g.id}-a" placeholder="—" value="${kA}" oninput="onKInput('${g.id}')">
+            <div class="fs8 cd3 mt6">Model: <span class="cp fw7">${((1-d.avg)*100).toFixed(0)}%</span></div>
+          </div>
+          <div>
+            <div class="fs8 cd3 mb6">${g.h} Kalshi % 🏠</div>
+            <input type="number" class="inp tc" id="ki-${g.id}-h" placeholder="—" value="${kH}" oninput="onKInput('${g.id}')">
+            <div class="fs8 cd3 mt6">Model: <span class="cp fw7">${(d.avg*100).toFixed(0)}%</span></div>
+          </div>
+        </div>
+        <div id="ka-${g.id}" class="mt8"></div>
+      </div></div>
+    </div>`;
+  }).join('');
+  el('kalshi-games').innerHTML = filterBar + gamesHtml;
+  setTimeout(() => D.games.forEach(g => onKInput(g.id)), 50);
+  setTimeout(applyGlowClasses, 150);
+  setTimeout(animateCounters, 100);
+}
+
+function onKInput(gid) {
+  const g = D.games.find(x => x.id === gid); if (!g) return;
+  const hV = parseInt(el(`ki-${gid}-h`)?.value) || 0;
+  const aV = parseInt(el(`ki-${gid}-a`)?.value) || 0;
+  const d = triModel(g.h, g.a, g);
+  let html = '';
+
+  if (hV && aV) {
+    const vig = hV + aV - 100;
+    html += `<div class="flex-b" style="padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.03);font-size:12px;color:var(--d2);margin-bottom:10px"><span>Vig: <span style="color:${vig>5?'var(--y)':'var(--g)'};font-weight:700">${vig}%</span></span><span>Total: <span class="fw7">${hV+aV}%</span></span></div>`;
+  }
+
+  [{tm:g.h,opp:g.a,kp:hV,mp:d.avg,mA:d.a,mB:d.b,mC:d.c},{tm:g.a,opp:g.h,kp:aV,mp:1-d.avg,mA:1-d.a,mB:1-d.b,mC:1-d.c}].forEach(s => {
+    if (!s.kp) return;
+    const edge = (s.mp - s.kp/100) * 100;
+    const k = kelly(s.mp, s.kp/100, d.conf);
+    const act = edge > 3 ? "BUY YES" : edge < -3 ? "BUY NO" : "PASS";
+    const ac = edge > 3 ? 'var(--g)' : edge < -3 ? 'var(--r)' : 'var(--d3)';
+    const strong = Math.abs(edge) > 8;
+
+    html += `<div style="background:${strong?'rgba(26,237,192,0.03)':'var(--bg)'};border:1px solid ${strong?'var(--kbd)':'var(--bd)'};border-radius:10px;padding:14px;margin-bottom:8px">
+      <div class="flex-b">
+        <div>
+          <span class="fs13 fw8">${s.tm}</span>
+          <span class="tg" style="background:${edge>3?'var(--gb)':edge<-3?'var(--rb)':'rgba(255,255,255,0.03)'};color:${ac};margin-left:4px">${act}</span>
+          ${confTag(d.conf)}
+        </div>
+        <div class="tr">
+          <div class="fs14 fw8" style="color:${edge>0?'var(--g)':'var(--r)'}">${edge>0?'+':''}${edge.toFixed(1)}%</div>
+        </div>
+      </div>
+      ${(() => {
+          const voHome = vegasOdds[g.h];
+          const voAway = voHome ? null : vegasOdds[g.a];
+          const vo = voHome || voAway;
+          const vProb = vo ? (s.tm === g.h ? vo.hProb : vo.aProb) : null;
+          const vOdds = vo ? (s.tm === g.h ? vo.hOdds : vo.aOdds) : null;
+          const cols = vProb ? 'g5' : 'g5';
+          return `<div style="display:grid;grid-template-columns:repeat(${vProb?6:5},1fr);gap:4px;background:var(--bg);border-radius:8px;padding:10px;margin-top:8px">
+            <div><div class="st-l ck">KALSHI</div><div class="fs14 fw8">${s.kp?s.kp+'%':'—'}</div></div>
+            <div><div class="st-l cp">MOD A</div><div class="fs14 fw8" style="color:${s.mA*100>s.kp?'var(--g)':'var(--r)'}">${(s.mA*100).toFixed(0)}%</div></div>
+            <div><div class="st-l cy">MOD B</div><div class="fs14 fw8" style="color:${s.mB*100>s.kp?'var(--g)':'var(--r)'}">${(s.mB*100).toFixed(0)}%</div></div>
+            <div><div class="st-l cb">MOD C</div><div class="fs14 fw8" style="color:${s.mC*100>s.kp?'var(--g)':'var(--r)'}">${(s.mC*100).toFixed(0)}%</div></div>
+            <div><div class="st-l" style="color:var(--k)">AVG</div><div class="fs14 fw8 ck">${(s.mp*100).toFixed(0)}%</div></div>
+            ${vProb ? `<div><div class="st-l" style="color:var(--y)">VEGAS</div><div class="fs14 fw8" style="color:var(--y)">${vProb}%</div><div class="fs8 cd4">${vOdds>0?'+':''}${vOdds}</div></div>` : ''}
+          </div>`;
+        })()}
+      ${k.bet > 0 ? `<div class="kelly-box"><div class="flex-b"><span class="fs8 ck ls1">KELLY</span><span class="fs14 fw8 ck">$${k.bet.toFixed(2)}</span></div><div class="fs8 cd3 mt6">${k.pct.toFixed(1)}% of bankroll · Edge: +${k.edge.toFixed(1)}% · Conf: ${d.conf}</div></div>` : ''}
+    </div>`;
+  });
+  const target = el(`ka-${gid}`); if (target) target.innerHTML = html;
+  updateKelly();
+}
+
+// ═══════════════════════════════════════════════════════
+// VALUE TAB
+// ═══════════════════════════════════════════════════════
+function renderValue() {
+  if (!D.games.length) { el('value-list').innerHTML = '<div class="empty"><i><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 72 72"><path fill="#0096d1" d="m26.1 49.8l9.6 21.8c0 .1-.1.1-.1.1L16.9 49.8zm-8.8-20.1H.1c0 .7 1.1 1.6 1.1 1.6l15.7 18.5l6.3-6.7z"/><path fill="#76dfff" d="M71.5 30.5c-.5.5-1.3.5-1.8 0c-.2-.2-.4-.6-.4-.9H54.6l-9.2-10L55 9.5l16.3 19.1s0 .1.1.1h.1c.5.6.5 1.4 0 1.8m-35.6-.8l9.4-10l-9.4-10.2l-9.4 10.2z"/><path fill="#59cafc" d="M36.3 71.7c-.1.1-.2 0-.1-.1l9.6-21.8H55zm12.4-28.6l6.3 6.7l16.4-19.2s.4-.6.4-.9H54.6z"/><path fill="#00b1ff" d="m26.5 19.7l-9.2 10H.1s.1-.6.5-1l15.8-18.5c.1-.1.2-.2.3-.2c.2-.3.5-.4.9-.4c.7 0 1.2.6 1.2 1.2c0 .2-.1.4-.2.6zm9.4 10l12.8 13.5l5.9-13.5zm-18.6 0l5.9 13.5L36 29.7zm8.8 20.1l9.7 22q.15.15.3 0l9.7-22zm22.6-6.7l-2.9 6.7H55z"/></svg></i><div class="fs12 cd2">No games loaded</div></div>'; return; }
+  const picks = [];
+  D.games.forEach(g => {
+    const d = triModel(g.h, g.a, g);
+    picks.push({g, tm:g.h, opp:g.a, avg:d.avg*100, mA:d.a*100, mB:d.b*100, mC:d.c*100, conf:d.conf, votes:d.votes, home:true});
+    picks.push({g, tm:g.a, opp:g.h, avg:(1-d.avg)*100, mA:(1-d.a)*100, mB:(1-d.b)*100, mC:(1-d.c)*100, conf:d.conf, votes:d.votes, home:false});
+  });
+  picks.sort((a,b) => b.avg - a.avg);
+
+  el('value-list').innerHTML = picks.map((p, i) => {
+    const net = D.teams[p.tm]?.net || 0;
+    const hi = p.avg > 55 && p.votes >= 2;
+    return `<div class="cd${hi?' cd-g':''}" style="padding:14px">
+      <div class="flex-b">
+        <div style="flex:1">
+          <div class="flex gap4 wrap" style="align-items:center">
+            <span class="fs9 cd4 fw8">#${i+1}</span>
+            <span class="fs13 fw8">${p.tm}</span>
+            <span class="fs10 cd2">over ${p.opp}</span>
+            ${p.home?'<span class="fs8">🏠</span>':''}
+            ${confTag(p.conf)}
+          </div>
+          <div class="flex gap6 mt6 fs9 wrap">
+            <span class="cd2">A: <span class="cp fw7">${p.mA.toFixed(1)}%</span></span>
+            <span class="cd2">B: <span class="cy fw7">${p.mB.toFixed(1)}%</span></span>
+            <span class="cd2">C: <span class="cb fw7">${p.mC.toFixed(1)}%</span></span>
+            <span style="color:${net>0?'var(--g)':'var(--r)'}">NET ${net>0?'+':''}${net.toFixed(1)}</span>
+            <span class="cd3">${p.g.t||''}</span>
+          </div>
+        </div>
+        <div class="tr" style="flex-shrink:0;padding-left:10px">
+          <div class="fs14 fw8" style="color:${p.avg>55?'var(--g)':p.avg>45?'var(--d2)':'var(--r)'}">${p.avg.toFixed(1)}%</div>
+          <div class="fs8 cd3 ls1">WIN PROB</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// PROPS TAB
+// ═══════════════════════════════════════════════════════
+function pSearch(q) {
+  const r = el('psr');
+  if (!q || q.length < 2) { r.innerHTML=''; r.classList.remove('open'); return; }
+  const lq = q.toLowerCase();
+  const matches = D.players.filter(p => p.name.toLowerCase().includes(lq));
+  r.innerHTML = matches.length ? matches.map(p => `<div class="sr" onclick="addProp('${p.name}')">${p.name} <span class="cd3" style="margin-left:6px">${p.team} · ${p.szn} PPG</span></div>`).join('') : '<div class="sr cd3">No matches</div>';
+  r.classList.add('open');
+}
+function addProp(name) { if (tracked.find(p=>p.name===name)) return; const p=D.players.find(x=>x.name===name); if(!p)return; tracked.push({...p}); el('ps').value=''; el('psr').classList.remove('open'); renderProps(); }
+function rmProp(name) { tracked=tracked.filter(p=>p.name!==name); renderProps(); }
+
+function renderProps() {
+  if (!tracked.length) { el('props-list').innerHTML = '<div class="empty"><i><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 48 48"><g fill="none" stroke-width="3"><path fill="#8fbffa" d="M24 3c11.598 0 21 9.402 21 21s-9.402 21-21 21S3 35.598 3 24S12.402 3 24 3"/><path fill="#fff" d="M9 24c0-8.284 6.716-15 15-15s15 6.716 15 15s-6.716 15-15 15S9 32.284 9 24"/><path stroke="#2859c5" stroke-linecap="round" stroke-linejoin="round" d="M24 9v4m15 11h-4M24 39v-4M9 24h4m8 0h6m-3-3v6"/></g></svg></i><div class="fs12 cd2">Load data — all players auto-populate</div></div>'; return; }
+  const byGame = {};
+  tracked.forEach(p => {
+    const g = D.games.find(x => x.h===p.team||x.a===p.team||x.h===p.opp||x.a===p.opp);
+    const key = g ? g.id : 'other';
+    if (!byGame[key]) byGame[key] = {game:g, players:[], collapsed: propCollapsed[key]||false};
+    byGame[key].players.push(p);
+  });
+
+  let html = '';
+  Object.entries(byGame).forEach(([key, group]) => {
+    const g = group.game;
+    const collapsed = propCollapsed[key] || false;
+    const count = group.players.length;
+    const strongCount = group.players.filter(p => {
+      const proj = projPts(p);
+      const line = p._kalshiLine || p._line || p.line;
+      return Math.abs(proj - line) > 3;
+    }).length;
+
+    if (g) {
+      html += `<div class="cd" style="margin-bottom:8px;border-radius:10px;overflow:hidden">
+        <div id="prop-header-${key}" class="flex-b" style="padding:12px 14px;cursor:pointer;user-select:none;background:rgba(255,255,255,0.03)" onclick="togglePropGroup('${key}')">
+          <div class="flex gap8" style="align-items:center">
+            <span class="fs13 fw8">
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${g.a.toLowerCase()}.png" style="width:18px;height:18px;border-radius:3px;vertical-align:middle;margin-right:3px" onerror="this.style.display='none'">
+            ${g.a} @
+            <img src="https://a.espncdn.com/i/teamlogos/nba/500/${g.h.toLowerCase()}.png" style="width:18px;height:18px;border-radius:3px;vertical-align:middle;margin:0 3px" onerror="this.style.display='none'">
+            ${g.h}
+          </span>
+            <span class="fs8 cd3">${g.t||''} ET</span>
+            ${strongCount > 0 ? `<span class="tg" style="background:var(--gb);color:var(--g)">${strongCount} STRONG</span>` : ''}
+          </div>
+          <div class="flex gap6" style="align-items:center">
+            <span class="fs8 cd3">${count} players</span>
+            <span class="chevron ${collapsed?'':'open'}">▶</span>
+          </div>
+        </div>
+        <div id="prop-group-${key}" class="collapsible-body ${collapsed?'':'open'}">`;
+    }
+
+    group.players.forEach(p => {
+      const proj = projPts(p);
+      const line = p._kalshiLine || p._line || p.line;
+      const diff = proj - line;
+      const over = diff > 0;
+      const str = Math.abs(diff) > 3 ? 'STRONG' : Math.abs(diff) > 1.5 ? 'LEAN' : 'NEUTRAL';
+      const oD = D.teams[p.opp]?.drtg || AVG_DRTG;
+      const cls = str==='STRONG' ? (over?'cd-g':'cd-r') : '';
+      const l10 = p.l10 || p.l5 || p.szn;
+      const hasKalshi = !!p._kalshiTicker;
+
+      const cardClass = str==='STRONG' ? (over ? 'player-card over-strong' : 'player-card under-strong') : 'player-card';
+      html += `<div class="${cardClass}">
+        <div class="flex-b mb6">
+          <div>
+            <div class="flex gap4 wrap" style="align-items:center">
+              <span class="fs14 fw8">${p.name}</span>
+              <img src="https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr(p.team)}.png" style="width:18px;height:18px;border-radius:3px;vertical-align:middle" onerror="this.style.display='none'">
+              <span class="tg" style="background:rgba(255,255,255,0.05);color:var(--d1)">${p.team}</span>
+              <span class="tg" style="background:rgba(255,255,255,0.04);color:var(--d3)">${p.pos||''}</span>
+              ${str==='STRONG'?`<span class="tg" style="background:${over?'var(--gb)':'var(--rb)'};color:${over?'var(--g)':'var(--r)'};box-shadow:0 0 8px ${over?'rgba(78,237,181,0.3)':'rgba(255,138,138,0.3)'};font-weight:800;display:inline-flex;align-items:center;gap:4px">${over?'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 80 80"><g fill="none"><path fill="#eb5757" fill-rule="evenodd" d="M40 67.965c11.046 0 20-8.954 20-20V46.76c0-4.42-1.38-8.728-3.95-12.325L40.04 12.02a.05.05 0 0 0-.08 0l-.145.205a9 9 0 0 0-.165 10.223l4.416 6.625A11.5 11.5 0 0 1 46 35.459v1.514c0 5.523-4.477 10-10 10s-10-4.477-10-10V35.46c0-2.273.673-4.495 1.934-6.386l2.15-3.224l-6.134 8.586A21.2 21.2 0 0 0 20 46.76v1.205c0 11.046 8.954 20 20 20" clip-rule="evenodd"/><path fill="#f2c94c" d="M51 36.973v-1.006l.982 1.375A16.2 16.2 0 0 1 55 46.76v1.205c0 8.284-6.716 15-15 15s-15-6.716-15-15v-.794a14.96 14.96 0 0 0 11 4.802c8.284 0 15-6.715 15-15"/></g></svg> STRONG OVER':'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"><g fill="none"><path fill="#66e2ff" d="m4.923 10.493l.619 4.23l4.708.326l2.835-5.355l-1.249-4.354l-1.929-2.295h-.529L8.343 3.9L7.297 7.5z"/><path fill="#21b3d3" d="m17.456 20l-1.507.983l-3.612-10.952l-.174-3.498L9.857 3l3.656 2.734l1.052 2.008l2.098.827l2.65 6.086z"/><path fill="#3fdcff" d="m8.608 14.587l-3.234-.22l-.686 2.054L6.684 21h9.265l1.31-6.058l-2.84-4.225l-2.138-.765v.444l-3.673 4.185z"/></g></svg> STRONG UNDER'} ${Math.abs((diff/line)*100).toFixed(0)}%</span>`:''}
+              ${str==='LEAN'?`<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">${over?'↑ LEAN OVER':'↓ LEAN UNDER'} ${Math.abs((diff/line)*100).toFixed(0)}%</span>`:''}
+              ${str==='NEUTRAL'?`<span class="tg" style="background:rgba(255,255,255,0.03);color:var(--d4)">NEUTRAL</span>`:''}
+              ${p.status==='GTD'?'<span class="tg" style="background:var(--yb);color:var(--y)">GTD</span>':''}
+              ${p.status==='OUT'?'<span class="tg" style="background:var(--rb);color:var(--r)">OUT</span>':''}
+              ${hasKalshi?'<span class="tg" style="background:var(--kb);color:var(--k)">KALSHI</span>':''}
+            </div>
+            <div class="fs8 cd3 mt6">vs ${p.opp} · ${p.note||''} ${getStreakBadge(p)} ${getMinTrendBadge(p)}</div>
+            ${hasKalshi ? `<div class="fs8 mt6" style="color:var(--k)">${p._kalshiTicker} · YES ${p._kalshiYes||'—'}¢ / NO ${p._kalshiNo||'—'}¢</div>` : ''}
+          </div>
+          <div class="tr" style="flex-shrink:0">
+            <div class="fs14 fw8" style="color:${Math.abs(diff)>1.5?(over?'var(--g)':'var(--r)'):'var(--d1)'}">${proj}</div>
+            <div class="fs8 cd3 ls1" style="display:flex;align-items:center;justify-content:flex-end;gap:3px"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 48 48"><g fill="none" stroke-width="3"><path fill="#8fbffa" d="M24 3c11.598 0 21 9.402 21 21s-9.402 21-21 21S3 35.598 3 24S12.402 3 24 3"/><path fill="#fff" d="M9 24c0-8.284 6.716-15 15-15s15 6.716 15 15s-6.716 15-15 15S9 32.284 9 24"/><path stroke="#2859c5" stroke-linecap="round" stroke-linejoin="round" d="M24 9v4m15 11h-4M24 39v-4M9 24h4m8 0h6m-3-3v6"/></g></svg>PROJ</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:4px;background:var(--bg);border-radius:8px;padding:10px;margin-bottom:8px">
+          <div><div class="st-l tt" data-tip="Season average">SZN</div><div class="fs12 fw7">${p.szn}</div></div>
+          <div><div class="st-l cb tt" data-tip="Last 10 games (decay-weighted)">L10</div><div class="fs12 fw7" style="color:${l10>p.szn?'var(--g)':'var(--r)'}">${l10}</div></div>
+          <div><div class="st-l cp tt" data-tip="Last 5 games avg">L5</div><div class="fs12 fw7" style="color:${(p.l5||p.szn)>p.szn?'var(--g)':'var(--r)'}">${p.l5||p.szn}</div></div>
+          <div><div class="st-l tt" data-tip="Avg minutes (L10)" style="display:flex;align-items:center;gap:2px"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24"><g fill="none"><path fill="#fff" d="M22.226 17.624L12 23.25L1.774 17.624V6.376L12 .75l10.226 5.625z"/><path fill="#bbd8ff" d="M22.226 6.376v11.248L12 23.25L1.774 17.624z"/><path stroke="#092f63" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" d="M12 20.18v-2.044M6.376 6.376L7.91 7.91m9.714-1.534L16.091 7.91m-9.715 9.714L7.91 16.09m9.714 1.534l-1.533-1.534M3.82 12h2.044m14.316 0h-2.044M12 4.842V12h4.09" stroke-width="1"/></g></svg>MIN</div><div class="fs12 fw7">${p.min||'—'}</div></div>
+          <div><div class="st-l cr tt" data-tip="Opponent defensive rating per 100 possessions" style="display:flex;align-items:center;gap:2px"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 128 128"><path fill="#106ba4" d="M64 128C7.63 95 7.19 30 7.19 30L64 0l27.12 14.32L120.81 30s0 63.5-56.81 98"/><path fill="#fff" d="M63.93 117.36C25.61 92.12 18.04 49.99 16.55 35.23L64 10.18l47.47 25.07c-.59 5.96-2.17 16.44-6.47 28.44c-8.12 22.7-21.93 40.74-41.07 53.67"/><path fill="#37bfe9" d="M64 117.36V10.18l47.51 25.07c-.59 5.96-2.15 16.44-6.45 28.44C96.93 86.39 83 104.43 64 117.36"/></svg>DEF</div><div class="fs12 fw7" style="color:${oD>114?'var(--g)':oD<110?'var(--r)':'var(--d1)'}">${oD.toFixed(1)}</div></div>
+          <div><div class="st-l" style="display:flex;align-items:center;gap:2px"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 48 48"><g fill="none" stroke-width="3"><path fill="#8fbffa" d="M24 3c11.598 0 21 9.402 21 21s-9.402 21-21 21S3 35.598 3 24S12.402 3 24 3"/><path fill="#fff" d="M9 24c0-8.284 6.716-15 15-15s15 6.716 15 15s-6.716 15-15 15S9 32.284 9 24"/><path stroke="#2859c5" stroke-linecap="round" stroke-linejoin="round" d="M24 3c11.598 0 21 9.402 21 21s-9.402 21-21 21S3 35.598 3 24S12.402 3 24 3"/></g></svg>${over?'OVER':'UNDR'}</div><div class="fs12 fw8" style="color:${over?'var(--g)':'var(--r)'}">${diff>0?'+':''}${diff.toFixed(1)}</div></div>
+        </div>
+        <div class="flex gap6" style="align-items:center">
+          <div style="flex:1"><div class="fs8 ck ls1 mb6">KALSHI LINE</div><input type="number" class="inp inp-sm inp-k tc" placeholder="${line}" value="${p._line!=null?p._line:(p._kalshiLine||'')}" onchange="updLine('${p.name}',this.value)"></div>
+          <div style="flex:1;background:${over?'var(--gb)':'var(--rb)'};border:1px solid ${over?'rgba(78,237,181,0.2)':'rgba(255,138,138,0.2)'};border-radius:6px;padding:8px;text-align:center">
+            <div class="fs8 cd3">${over?'OVER':'UNDER'}</div>
+            <div class="fs14 fw8" style="color:${over?'var(--g)':'var(--r)'}">${diff>0?'+':''}${diff.toFixed(1)}</div>
+          </div>
+          ${hasKalshi ? `<button class="btn btn-k" style="padding:6px 10px;font-size:10px" onclick="goTradeFromProp('${p._kalshiTicker}')">BET NO</button>` : ''}
+          <button class="btn-d" onclick="rmProp('${p.name}')">✕</button>
+        </div>
+      </div>`;
+    });
+
+    if (g) html += `</div></div>`;
+  });
+  el('props-list').innerHTML = html;
+}
+
+function togglePropGroup(key) {
+  propCollapsed[key] = !propCollapsed[key];
+  const body = el('prop-group-' + key);
+  const chevron = document.querySelector(`#prop-header-${key} .chevron`);
+  if (body) body.classList.toggle('open', !propCollapsed[key]);
+  if (chevron) chevron.classList.toggle('open', !propCollapsed[key]);
+}
+
+function toggleKalshiGame(id) {
+  kalshiCollapsed[id] = !kalshiCollapsed[id];
+  const body = el('kg-body-' + id);
+  const chevron = document.querySelector('#kg-' + id + ' .chevron');
+  if (body) body.classList.toggle('open', !kalshiCollapsed[id]);
+  if (chevron) chevron.classList.toggle('open', !kalshiCollapsed[id]);
+  if (!kalshiCollapsed[id]) setTimeout(() => onKInput(id), 350);
+}
+
+function setGameFilter(id) {
+  activeGameFilter = id;
+  renderKalshi();
+  // Also filter props tab
+  if (id) {
+    Object.keys(propCollapsed).forEach(k => { propCollapsed[k] = true; });
+    propCollapsed[id] = false;
+  } else {
+    Object.keys(propCollapsed).forEach(k => { propCollapsed[k] = false; });
+  }
+  renderProps();
+}
+
+function updLine(name, val) { const p=tracked.find(x=>x.name===name); if(p){ p._line=parseFloat(val)||0; renderProps(); } }
+
+function goTradeFromProp(ticker) {
+  // Jump to trade tab and pre-select this market
+  go('trade');
+  selectedTicker = ticker;
+  el('mkt-search').value = ticker;
+  el('trade-detail').style.display = 'block';
+  const tes = el('trade-empty-state'); if(tes) tes.style.display='none';
+  const mkt = kalshiMarkets.find(m => m.ticker === ticker);
+  el('ob-title').textContent = mkt?.title || ticker;
+  el('ob-ticker').textContent = ticker;
+  el('trade-side').value = 'no';
+  refreshOrderbook();
+}
+
+// ═══════════════════════════════════════════════════════
+// KELLY TAB
+// ═══════════════════════════════════════════════════════
+function updateKelly() {
+  const bets = [];
+  D.games.forEach(g => {
+    const d = triModel(g.h, g.a, g);
+    [{tm:g.h,kpId:`ki-${g.id}-h`,mp:d.avg},{tm:g.a,kpId:`ki-${g.id}-a`,mp:1-d.avg}].forEach(s => {
+      const kp = parseInt(el(s.kpId)?.value) || 0; if (!kp) return;
+      const k = kelly(s.mp, kp/100, d.conf);
+      if (k.bet > 0) bets.push({...k, team:s.tm, kalshi:kp, game:`${g.a}@${g.h}`, time:g.t||'', conf:d.conf});
+    });
+  });
+  if (!bets.length) { el('kelly-list').innerHTML = '<div class="empty"><i><svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 48 48"><g fill="none" stroke-linejoin="round" stroke-width="4"><path fill="#2f88ff" stroke="#000" d="M40 4H8C6.9 4 6 4.9 6 6v36c0 1.1.9 2 2 2h32c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"/><path fill="#43ccf8" stroke="#fff" d="M35 10H13V19H35V10Z"/><path stroke="#fff" stroke-linecap="round" d="M12 28L19 35M19 28L12 35M28 35H36M28 29H36"/></g></svg></i><div class="fs12 cd2">No positive-edge bets found</div></div>'; return; }
+  bets.sort((a,b) => b.bet - a.bet);
+  const total = bets.reduce((s,b) => s+b.bet, 0);
+  const br = parseFloat(el('bankroll').value) || 100;
+
+  let html = `<div class="cd cd-hl mb10"><div class="g2"><div><div class="st-l ck">TOTAL WAGERED</div><div class="st-v ck">$${total.toFixed(2)}</div></div><div class="tr"><div class="st-l">OF BANKROLL</div><div class="st-v" style="color:${total/br>0.25?'var(--r)':'var(--g)'}">${(total/br*100).toFixed(1)}%</div></div></div>${total/br>0.25?'<div class="fs9 cr mt6">⚠️ Over 25% max exposure — consider reducing</div>':''}</div>`;
+
+  bets.forEach((b,i) => {
+    html += `<div class="cd" style="padding:14px"><div class="flex-b">
+      <div><span class="fs9 cd4 fw8">#${i+1}</span> <span class="fs13 fw8">${b.team}</span> ${confTag(b.conf)} <span class="fs9 cd2">${b.game} · ${b.time}</span></div>
+      <div class="tr"><div class="fs14 fw8 ck">$${b.bet.toFixed(2)}</div><div class="fs8 cd3">+${b.edge.toFixed(1)}% edge</div></div>
+    </div></div>`;
+  });
+  el('kelly-list').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+// TABS & UTILS
+// ═══════════════════════════════════════════════════════
+function go(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t => { t.classList.remove('on','on-k'); });
+  el('p-'+id).classList.add('on');
+  document.querySelector(`[data-t="${id}"]`).classList.add(id==='kalshi'||id==='trade'?'on-k':'on');
+}
+function el(id) { return document.getElementById(id); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Restore persisted settings
+  const saved = JSON.parse(localStorage.getItem('delta_settings') || '{}');
+  if (saved.bankroll) el('bankroll').value = saved.bankroll;
+  if (saved.kellyFrac) el('kelly-frac').value = saved.kellyFrac;
+
+  // Restore saved weights to sliders
+  if (modelWeights) {
+    const wa = el('wt-a'), wb = el('wt-b'), wc = el('wt-c');
+    if (wa) wa.value = Math.round(modelWeights.a * 100);
+    if (wb) wb.value = Math.round(modelWeights.b * 100);
+    if (wc) wc.value = Math.round(modelWeights.c * 100);
+    updateWeights();
+  }
+
+  renderAll();
+  renderTracker();
+  checkBridge();
+});
+
+// Persist bankroll + kelly on change
+function persistSettings() {
+  localStorage.setItem('delta_settings', JSON.stringify({
+    bankroll: el('bankroll').value,
+    kellyFrac: el('kelly-frac').value,
+  }));
+}
+
+let manualInjuries = []; // [{name, team, status, star, starter}]
+
+function injSearch(q) {
+  const wrap = el('inj-search-results');
+  if (!q || q.length < 2) { wrap.style.display='none'; return; }
+  const matches = D.players.filter(p => p.name.toLowerCase().includes(q.toLowerCase())).slice(0, 5);
+  if (!matches.length) { wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  wrap.innerHTML = matches.map(p =>
+    `<div class="sr" onclick="selectInjPlayer('${p.name}','${p.team}')">${p.name} <span class="cd3">${p.team}</span></div>`
+  ).join('');
+}
+
+let selectedInjTeam = '';
+function selectInjPlayer(name, team) {
+  el('inj-name').value = name;
+  selectedInjTeam = team;
+  el('inj-search-results').style.display = 'none';
+}
+
+function addManualInjury() {
+  const name = el('inj-name').value.trim();
+  const status = el('inj-status').value;
+  const star = el('inj-star').checked;
+  const starter = el('inj-starter').checked;
+  if (!name) return;
+
+  // Find team from players data or use selectedInjTeam
+  const player = D.players.find(p => p.name.toLowerCase() === name.toLowerCase());
+  const team = selectedInjTeam || player?.team || '';
+
+  if (!team) { alert('Player not found in loaded data — load game data first'); return; }
+
+  // Remove existing entry for this player
+  manualInjuries = manualInjuries.filter(x => x.name !== name);
+  manualInjuries.push({ name, team, status, star, starter });
+
+  // Update D.injuries
+  if (!D.injuries[team]) D.injuries[team] = [];
+  D.injuries[team] = D.injuries[team].filter(x => x.p !== name);
+  D.injuries[team].push({ p: name, s: status, star, starter });
+
+  // Also update player status in tracked
+  const tp = tracked.find(p => p.name === name);
+  if (tp) tp.status = status;
+
+  el('inj-name').value = '';
+  selectedInjTeam = '';
+  el('inj-star').checked = false;
+  el('inj-starter').checked = true;
+  renderManualInjuries();
+  renderAll();
+}
+
+function removeManualInjury(name) {
+  const inj = manualInjuries.find(x => x.name === name);
+  if (inj && D.injuries[inj.team]) {
+    D.injuries[inj.team] = D.injuries[inj.team].filter(x => x.p !== name);
+  }
+  manualInjuries = manualInjuries.filter(x => x.name !== name);
+  renderManualInjuries();
+  renderAll();
+}
+
+// ── GLOWING CARD BORDER (mouse tracking) ──
+document.addEventListener('mousemove', (e) => {
+  document.querySelectorAll('.cd-glow').forEach(card => {
+    const rect = card.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const dx = e.clientX - (rect.left + rect.width/2);
+    const dy = e.clientY - (rect.top + rect.height/2);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    const dist = Math.hypot(dx, dy);
+    const maxDist = Math.hypot(rect.width, rect.height) / 2;
+    const opacity = Math.max(0, 1 - dist / (maxDist * 1.5));
+    card.style.setProperty('--glow-x', x + '%');
+    card.style.setProperty('--glow-y', y + '%');
+    card.style.setProperty('--glow-angle', angle + 'deg');
+    card.style.setProperty('--glow-opacity', opacity * 0.6);
+  });
+});
+
+function applyGlowClasses() {
+  document.querySelectorAll('#kalshi-games .cd').forEach(card => {
+    card.classList.add('cd-glow');
+    if (card.innerHTML.includes('LOCK')) card.classList.add('cd-lock');
+  });
+}
+
+
+
+
+// ══════════════════════════════════════════════════════════
+// SUB-TAB SWITCHER (tracker panel)
+// ══════════════════════════════════════════════════════════
+function switchSub(name) {
+  ['tracker','backtest','weights'].forEach(s => {
+    const panel = el('sub-p-' + s);
+    const btn = el('sub-' + s);
+    if (panel) panel.style.display = s === name ? 'block' : 'none';
+    if (btn) {
+      btn.className = s === name ? 'btn btn-k btn-full' : 'btn btn-full';
+      btn.style.borderRadius = '7px';
+      btn.style.fontSize = '10px';
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// BACKTEST ENGINE
+// ══════════════════════════════════════════════════════════
+async function runBacktest() {
+  const days = parseInt(el('bt-days').value) || 14;
+  const container = el('bt-results');
+  container.innerHTML = `<div class="cd"><div class="pulse fs10 cd3">Fetching ${days} days of ESPN results...</div></div>`;
+
+  const results = [];
+  const today = new Date();
+
+  // For longer ranges, batch into weeks to reduce API calls
+  const batchSize = days > 30 ? 7 : 1;
+  const batches = [];
+  for (let i = 1; i <= days; i += batchSize) {
+    const start = new Date(today); start.setDate(start.getDate() - Math.min(i + batchSize - 1, days));
+    const end = new Date(today); end.setDate(end.getDate() - i);
+    batches.push({ start, end });
+  }
+
+  for (const batch of batches) {
+    const startStr = batch.start.toISOString().slice(0,10).replace(/-/g,'');
+    const endStr = batch.end.toISOString().slice(0,10).replace(/-/g,'');
+    const url = batchSize > 1
+      ? `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${startStr}-${endStr}&limit=100`
+      : `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${endStr}`;
+    try {
+      const r = await fetch(url);
+      const data = await r.json();
+      const events = data.events || [];
+      for (const ev of events) {
+        const comp = ev.competitions?.[0];
+        if (!comp?.status?.type?.completed) continue;
+        const teams = comp.competitors || [];
+        const homeT = teams.find(t => t.homeAway === 'home');
+        const awayT = teams.find(t => t.homeAway === 'away');
+        if (!homeT || !awayT) continue;
+        const homeAbbr = homeT.team?.abbreviation || '';
+        const awayAbbr = awayT.team?.abbreviation || '';
+        const homeScore = parseInt(homeT.score || 0);
+        const awayScore = parseInt(awayT.score || 0);
+        if (!homeScore || !awayScore) continue;
+        const gameDate = ev.date?.slice(0,10) || batch.end.toISOString().slice(0,10);
+        results.push({ date: gameDate, home: homeAbbr, away: awayAbbr, homeScore, awayScore, homeWon: homeScore > awayScore });
+      }
+    } catch(e) { /* skip batch */ }
+    await new Promise(r => setTimeout(r, 120));
+    container.innerHTML = `<div class="cd"><div class="pulse fs10 cd3">Fetching... ${results.length} games found so far</div></div>`;
+  }
+
+  if (!results.length) {
+    container.innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">No results fetched — check connection</div></div>`;
+    return;
+  }
+
+  // Run models against historical results
+  // We use current team data as a proxy (not ideal but best we have without historical stats)
+  const tierResults = { LOCK:{w:0,l:0}, HIGH:{w:0,l:0}, MED:{w:0,l:0}, LOW:{w:0,l:0} };
+  const modelResults = { A:{w:0,l:0}, B:{w:0,l:0}, C:{w:0,l:0}, consensus:{w:0,l:0} };
+  const dayRows = [];
+  let brier = 0; // Brier score (lower = better calibration)
+
+  results.forEach(r => {
+    // Find matching team data
+    const hT = D.teams[r.home] || D.teams[Object.keys(D.teams).find(k => k.includes(r.home) || r.home.includes(k))] || {};
+    const aT = D.teams[r.away] || D.teams[Object.keys(D.teams).find(k => k.includes(r.away) || r.away.includes(k))] || {};
+    if (!Object.keys(hT).length && !Object.keys(aT).length) return; // no team data
+
+    const fakeGame = { id: r.home+'_'+r.away, h: r.home, a: r.away, hRest:1, aRest:1 };
+    const mA = modelA(r.home, r.away, fakeGame);
+    const mB = modelB(r.home, r.away, fakeGame);
+    const mC = modelC(r.home, r.away, fakeGame);
+
+    const wA = modelWeights.a, wB = modelWeights.b, wC = modelWeights.c;
+    const avg = mA.prob * wA + mB.prob * wB + mC.prob * wC;
+    const votes = [mA.prob > 0.5, mB.prob > 0.5, mC.prob > 0.5].filter(Boolean).length;
+    const conf = votes === 3 ? (Math.abs(avg - 0.5) > 0.10 ? 'LOCK' : 'HIGH') : votes >= 2 ? 'MED' : 'LOW';
+    const pick = avg > 0.5 ? r.home : r.away;
+    const correct = (avg > 0.5) === r.homeWon;
+
+    if (tierResults[conf]) {
+      if (correct) tierResults[conf].w++; else tierResults[conf].l++;
+    }
+    if (correct) modelResults.consensus.w++; else modelResults.consensus.l++;
+    if ((mA.prob > 0.5) === r.homeWon) modelResults.A.w++; else modelResults.A.l++;
+    if ((mB.prob > 0.5) === r.homeWon) modelResults.B.w++; else modelResults.B.l++;
+    if ((mC.prob > 0.5) === r.homeWon) modelResults.C.w++; else modelResults.C.l++;
+
+    // Brier score
+    const outcome = r.homeWon ? 1 : 0;
+    brier += Math.pow(avg - outcome, 2);
+
+    dayRows.push({ ...r, pick, avg, conf, correct });
+  });
+
+  const totalGames = results.length;
+  const totalW = modelResults.consensus.w;
+  const totalAcc = totalGames > 0 ? (totalW/totalGames*100).toFixed(1) : '—';
+  const brierScore = totalGames > 0 ? (brier/totalGames).toFixed(3) : '—';
+  const avgBrier = 0.25; // baseline for random 50/50
+  const brierVsBase = totalGames > 0 ? ((avgBrier - brier/totalGames) / avgBrier * 100).toFixed(1) : '—';
+
+  const tierColors = {LOCK:'var(--k)',HIGH:'var(--g)',MED:'var(--y)',LOW:'var(--r)'};
+  const accColor = (w,l) => {
+    const pct = (w+l)>0?w/(w+l):0.5;
+    return pct>0.58?'var(--g)':pct<0.48?'var(--r)':'var(--y)';
+  };
+
+  let html = `
+    <div class="bt-grid">
+      <div class="bt-stat">
+        <div class="bt-stat-val" style="color:${parseFloat(totalAcc)>55?'var(--g)':parseFloat(totalAcc)<48?'var(--r)':'var(--y)'}">${totalAcc}%</div>
+        <div class="bt-stat-lbl">OVERALL ACC</div>
+      </div>
+      <div class="bt-stat">
+        <div class="bt-stat-val ck">${totalW}-${totalGames-totalW}</div>
+        <div class="bt-stat-lbl">W-L (${totalGames} GAMES)</div>
+      </div>
+      <div class="bt-stat">
+        <div class="bt-stat-val" style="color:${parseFloat(brierVsBase)>0?'var(--g)':'var(--r)'}">${brierVsBase > 0 ? '+' : ''}${brierVsBase}%</div>
+        <div class="bt-stat-lbl">VS BASELINE</div>
+      </div>
+      <div class="bt-stat">
+        <div class="bt-stat-val" style="color:var(--p)">${brierScore}</div>
+        <div class="bt-stat-lbl">BRIER SCORE</div>
+      </div>
+    </div>
+
+    <div class="section-label">BY CONFIDENCE TIER</div>
+    <div style="margin-bottom:14px">
+      ${['LOCK','HIGH','MED','LOW'].map(tier => {
+        const {w,l} = tierResults[tier];
+        const total = w+l;
+        const pct = total>0?(w/total*100).toFixed(0):null;
+        const barW = pct||0;
+        return `<div class="bt-tier-row">
+          <span class="fw7" style="color:${tierColors[tier]};font-size:11px">${tier}</span>
+          <div>
+            <div class="bt-bar-wrap">
+              <div class="bt-bar-fill" style="width:${barW}%;background:${tierColors[tier]};opacity:0.7"></div>
+            </div>
+          </div>
+          <span class="fw7 tc" style="color:${accColor(w,l)};font-size:13px">${pct?pct+'%':'—'}</span>
+          <span class="fs9 cd2 tc">${w}-${l}</span>
+          <span class="fs8 cd4 tc">${total} games</span>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section-label">MODEL ACCURACY</div>
+    <div class="cd" style="padding:10px 14px;margin-bottom:10px;border-color:rgba(255,201,74,0.2);background:rgba(255,201,74,0.03)">
+      <div class="fs9 cy fw7 mb4">NOTE — MODEL C IN BACKTEST</div>
+      <div class="fs9 cd2">Model C runs in Pythagorean fallback mode during backtest because historical Vegas odds aren't available. Its live accuracy when Vegas is loaded will be higher (~58-60%). The 53% reflects the fallback only.</div>
+    </div>
+    <div class="g3 mb12">
+      ${['A','B','C'].map((m,i) => {
+        const {w,l} = modelResults[m];
+        const total=w+l;
+        const pct=total>0?(w/total*100).toFixed(1):'—';
+        const colors=['var(--p)','var(--y)','var(--b)'];
+        const labels=['EFFICIENCY','MOMENTUM','MATCHUP'];
+        return `<div class="bt-stat">
+          <div class="bt-stat-val" style="color:${colors[i]}">${pct}${total>0?'%':''}</div>
+          <div class="bt-stat-lbl">MODEL ${m} · ${labels[i]}</div>
+          <div class="fs9 cd4 mt6">${w}-${l}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section-label">GAME LOG</div>
+    <div>
+      ${dayRows.slice().reverse().map(r => `
+        <div class="bt-day-row">
+          <span class="fw7">${r.away} @ ${r.home}</span>
+          <span class="fs8 cd3">${r.date}</span>
+          <span class="fs8">PICK: <span class="fw7 ${r.pick===r.home?'ck':'cp'}">${r.pick}</span></span>
+          <span class="fs9 cd3">${(r.avg*100).toFixed(0)}%</span>
+          <span class="tg" style="background:${tierColors[r.conf]+'22'};color:${tierColors[r.conf]}">${r.conf}</span>
+          <span class="fw8 fs10" style="color:${r.correct?'var(--g)':'var(--r)'}">${r.correct?'✓':'✗'}</span>
+          <span class="fs9 cd3">${r.away} ${r.awayScore} — ${r.homeScore} ${r.home}</span>
+        </div>`).join('')}
+    </div>
+  `;
+
+  container.innerHTML = html;
+  showToast(`Backtest complete — ${totalGames} games, ${totalAcc}% accuracy`, parseFloat(totalAcc)>55?'success':'info');
+}
+
+// ══════════════════════════════════════════════════════════
+// MODEL WEIGHT OPTIMIZER
+// ══════════════════════════════════════════════════════════
+let modelWeights = JSON.parse(localStorage.getItem('delta_weights') || '{"a":0.50,"b":0.35,"c":0.15}');
+
+function updateWeights() {
+  const a = parseInt(el('wt-a').value);
+  const b = parseInt(el('wt-b').value);
+  const c = parseInt(el('wt-c').value);
+  const total = a + b + c;
+
+  el('wt-a-val').textContent = a + '%';
+  el('wt-b-val').textContent = b + '%';
+  el('wt-c-val').textContent = c + '%';
+
+  // Update slider fill via CSS custom property
+  el('wt-a').style.setProperty('--slider-pct', a + '%');
+  el('wt-b').style.setProperty('--slider-pct', b + '%');
+  el('wt-c').style.setProperty('--slider-pct', c + '%');
+
+  const totalEl = el('wt-total');
+  if (total === 100) {
+    totalEl.style.background = 'rgba(0,245,196,0.08)';
+    totalEl.style.color = 'var(--k)';
+    totalEl.style.border = '1px solid rgba(0,245,196,0.2)';
+    totalEl.textContent = `Total: ${total}% ✓`;
+  } else {
+    totalEl.style.background = 'rgba(255,107,107,0.08)';
+    totalEl.style.color = 'var(--r)';
+    totalEl.style.border = '1px solid rgba(255,107,107,0.2)';
+    totalEl.textContent = `Total: ${total}% — must equal 100%`;
+  }
+
+  // Live preview if data loaded
+  if (D.games.length) {
+    const prevWrap = el('wt-preview-wrap');
+    const prev = el('wt-preview');
+    if (prevWrap) prevWrap.style.display = 'block';
+    if (prev) {
+      const wA = a/100, wB = b/100, wC = c/100;
+      prev.innerHTML = D.games.map(g => {
+        const rA = modelA(g.h, g.a, g);
+        const rB = modelB(g.h, g.a, g);
+        const rC = modelC(g.h, g.a, g);
+        const avg = rA.prob * wA + rB.prob * wB + rC.prob * wC;
+        const votes = [rA.prob>0.5,rB.prob>0.5,rC.prob>0.5].filter(Boolean).length;
+        const conf = votes===3?(Math.abs(avg-0.5)>0.10?'LOCK':'HIGH'):votes>=2?'MED':'LOW';
+        const tierColors = {LOCK:'var(--k)',HIGH:'var(--g)',MED:'var(--y)',LOW:'var(--r)'};
+        return `<div class="wt-prev-card">
+          <div class="fs8 cd3">${g.away||g.a} @ ${g.h}</div>
+          <div class="fs13 fw8 ck mt6">${(avg*100).toFixed(0)}%</div>
+          <div class="fs8 cd3">${g.h} WIN</div>
+          <div class="mt4"><span class="tg" style="background:${tierColors[conf]+'22'};color:${tierColors[conf]};font-size:9px">${conf}</span></div>
+        </div>`;
+      }).join('');
+    }
+  }
+}
+
+function applyWeights() {
+  const a = parseInt(el('wt-a').value);
+  const b = parseInt(el('wt-b').value);
+  const c = parseInt(el('wt-c').value);
+  if (a + b + c !== 100) { showToast('Weights must total 100%', 'error'); return; }
+  modelWeights = { a: a/100, b: b/100, c: c/100 };
+  localStorage.setItem('delta_weights', JSON.stringify(modelWeights));
+  renderAll();
+  showToast(`Weights applied: A ${a}% / B ${b}% / C ${c}%`, 'success');
+}
+
+function resetWeights() {
+  modelWeights = { a: 0.45, b: 0.30, c: 0.25 };
+  localStorage.setItem('delta_weights', JSON.stringify(modelWeights));
+  el('wt-a').value = 45; el('wt-b').value = 30; el('wt-c').value = 25;
+  updateWeights();
+  renderAll();
+  showToast('Weights reset to default 45/30/25', 'info');
+}
+
+// (weight sliders initialized in main DOMContentLoaded)
+
+// ══════════════════════════════════════════════════
+// WIN/LOSS TRACKER
+// ══════════════════════════════════════════════════
+let predictions = JSON.parse(localStorage.getItem('delta_predictions') || '[]');
+
+function savePredictions() {
+  localStorage.setItem('delta_predictions', JSON.stringify(predictions));
+}
+
+function logPredictions() {
+  if (!D.games.length) return;
+  D.games.forEach(g => {
+    const d = triModel(g.h, g.a, g);
+    const key = `${D.date||new Date().toISOString().slice(0,10)}_${g.id}`;
+    // Don't double-log same game/date
+    if (predictions.find(p => p.key === key)) return;
+    predictions.push({
+      key,
+      date: D.date || new Date().toISOString().slice(0,10),
+      home: g.h,
+      away: g.a,
+      pick: g.h, // model picks home team
+      modelPct: (d.avg * 100).toFixed(0),
+      conf: d.conf,
+      time: g.t || '',
+      result: 'pending', // 'win' | 'loss' | 'pending'
+    });
+  });
+  savePredictions();
+  renderTracker();
+  if (D.games.length) showToast(`${D.games.length} predictions logged`, 'info', 2500);
+}
+
+async function checkResults() {
+  const pending = predictions.filter(p => p.result === 'pending');
+  if (!pending.length) { showToast('No pending predictions', 'info'); return; }
+  showToast('Checking ESPN scores...', 'info', 2000);
+
+  let checked = 0;
+  for (const pred of pending) {
+    try {
+      // Use today's scoreboard offset — try to find the game
+      const dateStr = pred.date.replace(/-/g, '');
+      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`);
+      const data = await r.json();
+      const events = data.events || [];
+
+      for (const ev of events) {
+        const comps = ev.competitions?.[0];
+        if (!comps) continue;
+        const teams = comps.competitors || [];
+        const homeT = teams.find(t => t.homeAway === 'home');
+        const awayT = teams.find(t => t.homeAway === 'away');
+        if (!homeT || !awayT) continue;
+
+        const homeAbbr = homeT.team?.abbreviation || '';
+        const awayAbbr = awayT.team?.abbreviation || '';
+
+        const matchesGame = (
+          homeAbbr === pred.home || homeAbbr.includes(pred.home) || pred.home.includes(homeAbbr)
+        ) && (
+          awayAbbr === pred.away || awayAbbr.includes(pred.away) || pred.away.includes(awayAbbr)
+        );
+
+        if (!matchesGame) continue;
+
+        const status = comps.status?.type?.completed;
+        if (!status) continue; // game not finished
+
+        const homeScore = parseInt(homeT.score || 0);
+        const awayScore = parseInt(awayT.score || 0);
+
+        if (homeScore === awayScore) continue; // tie/no data
+
+        const homeWon = homeScore > awayScore;
+        const pickWon = (pred.pick === pred.home && homeWon) || (pred.pick === pred.away && !homeWon);
+
+        pred.result = pickWon ? 'win' : 'loss';
+        pred.homeScore = homeScore;
+        pred.awayScore = awayScore;
+        checked++;
+        break;
+      }
+    } catch(e) { console.warn('Score check failed:', e); }
+  }
+
+  savePredictions();
+  renderTracker();
+  if (checked > 0) showToast(`${checked} result${checked>1?'s':''} updated`, 'success');
+  else showToast('No completed games found yet', 'info');
+}
+
+function clearTracker() {
+  if (!confirm('Clear all predictions?')) return;
+  predictions = [];
+  savePredictions();
+  renderTracker();
+  showToast('Tracker cleared', 'info');
+}
+
+function renderTracker() {
+  const tiers = ['LOCK','HIGH','MED','LOW'];
+  const tierColors = {LOCK:'var(--k)',HIGH:'var(--g)',MED:'var(--y)',LOW:'var(--r)'};
+
+  // Summary cards
+  const summaryHtml = tiers.map(tier => {
+    const tierPreds = predictions.filter(p => p.conf === tier);
+    const wins = tierPreds.filter(p => p.result === 'win').length;
+    const losses = tierPreds.filter(p => p.result === 'loss').length;
+    const total = wins + losses;
+    const pct = total > 0 ? ((wins/total)*100).toFixed(0) : '—';
+    const pending = tierPreds.filter(p => p.result === 'pending').length;
+    return `<div class="tracker-tier">
+      <div class="tracker-tier-name">${tier}</div>
+      <div class="tracker-tier-record" style="color:${tierColors[tier]}">${wins}-${losses}</div>
+      <div class="tracker-tier-pct" style="color:${total>0?(wins/total>0.55?'var(--g)':wins/total<0.45?'var(--r)':'var(--d2)'):'var(--d4)'}">${pct}${total>0?'%':''}</div>
+      ${pending > 0 ? `<div style="font-size:9px;color:var(--d4);margin-top:3px">${pending} pending</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const summaryEl = el('tracker-summary');
+  if (summaryEl) summaryEl.innerHTML = summaryHtml;
+
+  // Prediction list — most recent first
+  const sorted = [...predictions].reverse();
+  const listHtml = sorted.length ? sorted.map(p => {
+    const isWin = p.result === 'win';
+    const isLoss = p.result === 'loss';
+    const rowClass = isWin ? 'win' : isLoss ? 'loss' : 'pending';
+    const resultBadge = isWin
+      ? `<span class="tg" style="background:var(--gb);color:var(--g)">WIN</span>`
+      : isLoss
+      ? `<span class="tg" style="background:var(--rb);color:var(--r)">LOSS</span>`
+      : `<span class="tg" style="background:rgba(255,255,255,0.04);color:var(--d3)">PENDING</span>`;
+    const score = p.homeScore != null
+      ? `<span class="fs9 cd3">${p.away} ${p.awayScore} — ${p.homeScore} ${p.home}</span>`
+      : '';
+    return `<div class="tracker-row ${rowClass}">
+      <div>
+        <span class="fw7">${p.away} @ ${p.home}</span>
+        <span class="fs9 cd3" style="margin-left:8px">${p.date}</span>
+        ${score}
+      </div>
+      <div class="flex gap6" style="align-items:center">
+        <span class="fs9 cd3">PICK: <span class="fw7" style="color:var(--p)">${p.pick}</span></span>
+        <span class="fs9 cd3">${p.modelPct}%</span>
+        ${confTag(p.conf)}
+        ${resultBadge}
+        <button class="btn-d" style="padding:2px 6px;font-size:9px" onclick="deletePred('${p.key}')">✕</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty"><div class="fs12 cd2">No predictions logged yet — load game data to start tracking</div></div>';
+
+  const listEl = el('tracker-list');
+  if (listEl) listEl.innerHTML = listHtml;
+}
+
+function deletePred(key) {
+  predictions = predictions.filter(p => p.key !== key);
+  savePredictions();
+  renderTracker();
+}
+
+// ── TOAST NOTIFICATIONS ──
+function showToast(msg, type='info', duration=3000) {
+  const container = el('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<div class="toast-dot"></div><span>${msg}</span>`;
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { toast.classList.add('show'); });
+  });
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 400);
+  }, duration);
+}
+
+// ── ANIMATED NUMBER COUNTER ──
+function animateCounters() {
+  document.querySelectorAll('.count-num[data-target]').forEach(el => {
+    const target = parseFloat(el.dataset.target);
+    const suffix = el.dataset.suffix || '';
+    const duration = 600;
+    const start = performance.now();
+    const from = 0;
+    const update = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // cubic ease out
+      const current = from + (target - from) * eased;
+      el.textContent = current.toFixed(1) + suffix;
+      if (progress < 1) requestAnimationFrame(update);
+      else el.textContent = target.toFixed(1) + suffix;
+    };
+    requestAnimationFrame(update);
+  });
+}
+
+// ── SKELETON LOADING ──
+function showSkeleton(containerId, count=4) {
+  const skels = Array.from({length:count}, (_, i) => `
+    <div class="skel-card">
+      <div class="flex-b mb8">
+        <div style="flex:1">
+          <div class="skeleton skel-line" style="width:${40+i*10}%"></div>
+          <div class="skeleton skel-line-sm"></div>
+        </div>
+        <div class="skeleton" style="width:50px;height:20px;border-radius:6px"></div>
+      </div>
+      <div class="skeleton skel-bar"></div>
+    </div>`).join('');
+  const c = el(containerId);
+  if (c) c.innerHTML = skels;
+}
+
+// ── BACKGROUND: STARS + PATHS + SHOOTING METEORS ──
+(function initBackground() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, paths = [], meteors = [], stars = [];
+  let meteorTimer = 0, twinkleTimer = 0;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    buildStars();
+    buildPaths();
+  }
+
+  // ── Static star field ──
+  function buildStars() {
+    stars = [];
+    const count = Math.floor((W * H) / 6000);
+    for (let i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 1.6 + 0.3,
+        baseOpacity: Math.random() * 0.7 + 0.25,
+        opacity: 0,
+        twinkleSpeed: 0.008 + Math.random() * 0.015,
+        twinkleOffset: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  // ── Flowing background paths ──
+  function buildPaths() {
+    paths = [];
+    const count = 24;
+    for (let i = 0; i < count; i++) {
+      paths.push({
+        speed: 0.00007 + Math.random() * 0.0001,
+        progress: Math.random(),
+        opacity: 0.03 + (i / count) * 0.05,
+        width: 0.4 + (i / count) * 0.5,
+        x0: -W * 0.2 - i * 8, y0: -H * 0.2 + i * 14,
+        x1: W * 0.1 + i * 6,  y1: H * 0.6 - i * 8,
+        x2: W * 0.6 - i * 4,  y2: H * 0.3 + i * 10,
+        x3: W * 1.1 + i * 6,  y3: H * 1.1 - i * 8,
+      });
+    }
+  }
+
+  function bezierPoint(p, t) {
+    const mt = 1 - t;
+    return {
+      x: mt*mt*mt*p.x0 + 3*mt*mt*t*p.x1 + 3*mt*t*t*p.x2 + t*t*t*p.x3,
+      y: mt*mt*mt*p.y0 + 3*mt*mt*t*p.y1 + 3*mt*t*t*p.y2 + t*t*t*p.y3,
+    };
+  }
+
+  // ── Shooting meteors ──
+  function spawnMeteor() {
+    const side = Math.floor(Math.random() * 2);
+    meteors.push({
+      x: side === 0 ? Math.random() * W : W + 10,
+      y: side === 0 ? -10 : Math.random() * H * 0.5,
+      vx: -2.5 - Math.random() * 2.5,
+      vy: 1.5 + Math.random() * 2,
+      len: 90 + Math.random() * 130,
+      opacity: 0,
+      maxOpacity: 0.5 + Math.random() * 0.3,
+      life: 0,
+      maxLife: 100 + Math.random() * 80,
+      color: Math.random() > 0.5 ? '#00f5c4' : '#a5b0ff',
+    });
+  }
+
+  let frame = 0;
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    frame++;
+
+    // ── Draw stars ──
+    stars.forEach(s => {
+      s.opacity = s.baseOpacity * (0.6 + 0.4 * Math.sin(frame * s.twinkleSpeed + s.twinkleOffset));
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${s.opacity})`;
+      ctx.fill();
+    });
+
+    // ── Draw paths ──
+    paths.forEach(p => {
+      p.progress += p.speed;
+      if (p.progress > 1) p.progress = 0;
+      const segLen = 0.22;
+      const start = Math.max(0, p.progress - segLen);
+      ctx.beginPath();
+      for (let i = 0; i <= 40; i++) {
+        const tt = start + (i / 40) * (p.progress - start);
+        const pt = bezierPoint(p, tt);
+        i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y);
+      }
+      const sp = bezierPoint(p, start), ep = bezierPoint(p, p.progress);
+      const g = ctx.createLinearGradient(sp.x, sp.y, ep.x, ep.y);
+      g.addColorStop(0, 'transparent');
+      g.addColorStop(0.5, `rgba(0,245,196,${p.opacity * 0.5})`);
+      g.addColorStop(1, `rgba(165,176,255,${p.opacity})`);
+      ctx.strokeStyle = g;
+      ctx.lineWidth = p.width;
+      ctx.stroke();
+    });
+
+    // ── Draw meteors ──
+    meteorTimer++;
+    if (meteorTimer > 100 + Math.random() * 160) { spawnMeteor(); meteorTimer = 0; }
+
+    meteors = meteors.filter(m => m.life < m.maxLife);
+    meteors.forEach(m => {
+      m.life++;
+      m.x += m.vx; m.y += m.vy;
+      if (m.life < 20) m.opacity = (m.life / 20) * m.maxOpacity;
+      else if (m.life > m.maxLife - 20) m.opacity = ((m.maxLife - m.life) / 20) * m.maxOpacity;
+      else m.opacity = m.maxOpacity;
+
+      const speed = Math.sqrt(m.vx*m.vx + m.vy*m.vy);
+      const tailX = m.x - m.vx * (m.len / speed);
+      const tailY = m.y - m.vy * (m.len / speed);
+
+      const mg = ctx.createLinearGradient(tailX, tailY, m.x, m.y);
+      mg.addColorStop(0, 'transparent');
+      const r = m.color === '#00f5c4' ? '0,245,196' : '165,176,255';
+      mg.addColorStop(0.7, `rgba(${r},${m.opacity * 0.4})`);
+      mg.addColorStop(1, `rgba(${r},${m.opacity})`);
+
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(m.x, m.y);
+      ctx.strokeStyle = mg;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Glowing head
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 2, 0, Math.PI * 2);
+      ctx.fillStyle = m.color;
+      ctx.globalAlpha = m.opacity;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Sparkle at head
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${m.opacity * 0.2})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  draw();
+})();
+
+// ── SPECIAL TEXT SCRAMBLE (for DELTA wordmark on load) ──
+(function scrambleDeltaTitle() {
+  const el = document.querySelector('.delta-name');
+  if (!el) return;
+  const target = 'DELTA';
+  const chars = '_!X$0-+*#';
+  let step = 0;
+  const totalSteps = target.length * 4;
+
+  const interval = setInterval(() => {
+    step++;
+    const revealed = Math.floor((step / totalSteps) * target.length);
+    let display = '';
+    for (let i = 0; i < target.length; i++) {
+      if (i < revealed) display += target[i];
+      else display += chars[Math.floor(Math.random() * chars.length)];
+    }
+    el.textContent = display;
+    if (step >= totalSteps) {
+      el.textContent = target;
+      clearInterval(interval);
+    }
+  }, 40);
+})();
+
+// ── GLOWING CARD BORDER (mouse tracking) ──
+document.addEventListener('mousemove', (e) => {
+  document.querySelectorAll('.cd-glow').forEach(card => {
+    const rect = card.getBoundingClientRect();
+    const dx = e.clientX - (rect.left + rect.width/2);
+    const dy = e.clientY - (rect.top + rect.height/2);
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    const dist = Math.hypot(dx, dy);
+    const maxDist = Math.hypot(rect.width, rect.height) / 2;
+    const opacity = Math.max(0, 1 - dist / (maxDist * 1.5));
+    card.style.setProperty('--glow-x', x + '%');
+    card.style.setProperty('--glow-y', y + '%');
+    card.style.setProperty('--glow-angle', angle + 'deg');
+    card.style.setProperty('--glow-opacity', opacity * 0.6);
+  });
+});
+</script>
+</body>
+</html>
