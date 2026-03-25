@@ -2552,13 +2552,6 @@ function switchSub(name) {
 async function runBacktest() {
   const days = parseInt(el('bt-days').value) || 14;
   const container = el('bt-results');
-
-  // Must have data loaded first
-  if (!D.games.length || !Object.keys(D.teams).length) {
-    container.innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">⚠ Load game data first — go to DATA tab and fetch ESPN data, then come back and run backtest.</div></div>`;
-    return;
-  }
-
   container.innerHTML = `<div class="cd"><div class="pulse fs10 cd3">Fetching ${days} days of ESPN results...</div></div>`;
 
   const results = [];
@@ -2581,7 +2574,6 @@ async function runBacktest() {
       : `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${endStr}`;
     try {
       const r = await fetch(url);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       const events = data.events || [];
       for (const ev of events) {
@@ -2599,22 +2591,15 @@ async function runBacktest() {
         const gameDate = ev.date?.slice(0,10) || batch.end.toISOString().slice(0,10);
         results.push({ date: gameDate, home: homeAbbr, away: awayAbbr, homeScore, awayScore, homeWon: homeScore > awayScore });
       }
-    } catch(e) {
-      console.warn('ESPN fetch failed:', url, e.message);
-    }
+    } catch(e) { /* skip batch */ }
     await new Promise(r => setTimeout(r, 120));
     container.innerHTML = `<div class="cd"><div class="pulse fs10 cd3">Fetching... ${results.length} games found so far</div></div>`;
   }
 
   if (!results.length) {
-    container.innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">No ESPN results fetched — check your internet connection. Make sure you can reach espn.com.</div></div>`;
+    container.innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">No results fetched — check connection</div></div>`;
     return;
   }
-
-  // Show what we found before model matching
-  console.log(`ESPN: ${results.length} completed games fetched`);
-  console.log('Sample ESPN abbrs:', [...new Set(results.map(r => r.home))].slice(0,10).join(', '));
-  console.log('Your team keys:', Object.keys(D.teams).slice(0,10).join(', '));
 
   // Run models against historical results
   // We use current team data as a proxy (not ideal but best we have without historical stats)
@@ -2623,42 +2608,22 @@ async function runBacktest() {
   const dayRows = [];
   let brier = 0; // Brier score (lower = better calibration)
 
-  // ESPN abbreviation normalization
-  const ESPN_NORM = {
-    'GS':'GSW','NO':'NOP','SA':'SAS','NY':'NYK','WSH':'WAS','UTAH':'UTA',
-    'PHX':'PHX','OKC':'OKC','MEM':'MEM','CLE':'CLE','MIL':'MIL','GSW':'GSW',
-    'NOP':'NOP','SAS':'SAS','NYK':'NYK','WAS':'WAS','UTA':'UTA','PHO':'PHX',
-  };
-  const norm = (a) => ESPN_NORM[a] || a;
-
-  // League average fallback for teams not in D.teams
-  const AVG_TEAM = {
-    ortg: AVG_ORTG, drtg: AVG_DRTG, net: 0, pace: AVG_PACE,
-    ptsFor: 114, ptsAgainst: 114, w: 41, l: 41,
-    hw: 24, hl: 17, aw: 17, al: 24,
-    l10w: 5, l10l: 5, l10ptsFor: 114, streak: 0,
-    tpr: 0.36, opp_adj_form: 0,
-  };
-
   results.forEach(r => {
-    const home = norm(r.home);
-    const away = norm(r.away);
-    // Use team data if available, fall back to league average — never skip
-    const hT = D.teams[home] || AVG_TEAM;
-    const aT = D.teams[away] || AVG_TEAM;
-    // Skip only if BOTH are unknown (no signal at all)
-    if (hT === AVG_TEAM && aT === AVG_TEAM) return;
+    // Find matching team data
+    const hT = D.teams[r.home] || D.teams[Object.keys(D.teams).find(k => k.includes(r.home) || r.home.includes(k))] || {};
+    const aT = D.teams[r.away] || D.teams[Object.keys(D.teams).find(k => k.includes(r.away) || r.away.includes(k))] || {};
+    if (!Object.keys(hT).length && !Object.keys(aT).length) return; // no team data
 
-    const fakeGame = { id: home+'_'+away, h: home, a: away, hRest:1, aRest:1 };
-    const mA = modelA(home, away, fakeGame);
-    const mB = modelB(home, away, fakeGame);
-    const mC = modelC(home, away, fakeGame);
+    const fakeGame = { id: r.home+'_'+r.away, h: r.home, a: r.away, hRest:1, aRest:1 };
+    const mA = modelA(r.home, r.away, fakeGame);
+    const mB = modelB(r.home, r.away, fakeGame);
+    const mC = modelC(r.home, r.away, fakeGame);
 
     const wA = modelWeights.a, wB = modelWeights.b, wC = modelWeights.c;
     const avg = mA.prob * wA + mB.prob * wB + mC.prob * wC;
     const votes = [mA.prob > 0.5, mB.prob > 0.5, mC.prob > 0.5].filter(Boolean).length;
     const conf = votes === 3 ? (Math.abs(avg - 0.5) > 0.10 ? 'LOCK' : 'HIGH') : votes >= 2 ? 'MED' : 'LOW';
-    const pick = avg > 0.5 ? home : away;
+    const pick = avg > 0.5 ? r.home : r.away;
     const correct = (avg > 0.5) === r.homeWon;
 
     if (tierResults[conf]) {
@@ -2669,26 +2634,19 @@ async function runBacktest() {
     if ((mB.prob > 0.5) === r.homeWon) modelResults.B.w++; else modelResults.B.l++;
     if ((mC.prob > 0.5) === r.homeWon) modelResults.C.w++; else modelResults.C.l++;
 
+    // Brier score
     const outcome = r.homeWon ? 1 : 0;
     brier += Math.pow(avg - outcome, 2);
 
-    dayRows.push({ ...r, home, away, pick, avg, conf, correct });
+    dayRows.push({ ...r, pick, avg, conf, correct });
   });
 
-  const totalGames = dayRows.length;
+  const totalGames = results.length;
   const totalW = modelResults.consensus.w;
   const totalAcc = totalGames > 0 ? (totalW/totalGames*100).toFixed(1) : '—';
   const brierScore = totalGames > 0 ? (brier/totalGames).toFixed(3) : '—';
-  const avgBrier = 0.25;
+  const avgBrier = 0.25; // baseline for random 50/50
   const brierVsBase = totalGames > 0 ? ((avgBrier - brier/totalGames) / avgBrier * 100).toFixed(1) : '—';
-
-  if (totalGames === 0) {
-    container.innerHTML = `<div class="cd cd-r"><div class="fs10 cr fw7">ESPN returned ${results.length} games but none matched your loaded teams.<br><br>
-    ESPN abbreviations found: ${[...new Set(results.map(r=>r.home+','+r.away))].slice(0,5).join(' | ')}<br>
-    Your teams: ${Object.keys(D.teams).slice(0,8).join(', ')}<br><br>
-    This usually means the abbreviation map needs updating. Open browser console (Cmd+Option+J) for details.</div></div>`;
-    return;
-  }
 
   const tierColors = {LOCK:'var(--k)',HIGH:'var(--g)',MED:'var(--y)',LOW:'var(--r)'};
   const accColor = (w,l) => {
@@ -2871,17 +2829,18 @@ function logPredictions() {
   D.games.forEach(g => {
     const d = triModel(g.h, g.a, g);
     const key = `${D.date||new Date().toISOString().slice(0,10)}_${g.id}`;
+    // Don't double-log same game/date
     if (predictions.find(p => p.key === key)) return;
     predictions.push({
       key,
       date: D.date || new Date().toISOString().slice(0,10),
       home: g.h,
       away: g.a,
-      pick: d.avg > 0.5 ? g.h : g.a, // actual model pick
+      pick: g.h, // model picks home team
       modelPct: (d.avg * 100).toFixed(0),
       conf: d.conf,
       time: g.t || '',
-      result: 'pending',
+      result: 'pending', // 'win' | 'loss' | 'pending'
     });
   });
   savePredictions();
@@ -2892,62 +2851,60 @@ function logPredictions() {
 async function checkResults() {
   const pending = predictions.filter(p => p.result === 'pending');
   if (!pending.length) { showToast('No pending predictions', 'info'); return; }
-  showToast('Checking ESPN scores...', 'info', 2500);
-
-  const ESPN_MAP = {
-    'GS':'GSW','NO':'NOP','SA':'SAS','NY':'NYK','WSH':'WAS','UTAH':'UTA',
-    'GSW':'GSW','NOP':'NOP','SAS':'SAS','NYK':'NYK','WAS':'WAS','UTA':'UTA',
-    'PHO':'PHX','PHX':'PHX','OKC':'OKC','MEM':'MEM','CLE':'CLE',
-  };
-  const normalize = (abbr) => ESPN_MAP[abbr] || abbr;
-
-  const today = new Date();
-  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-  const datesToCheck = new Set(pending.map(p => p.date.replace(/-/g,'')));
-  datesToCheck.add(yesterday.toISOString().slice(0,10).replace(/-/g,''));
-  datesToCheck.add(today.toISOString().slice(0,10).replace(/-/g,''));
-
-  const resultsMap = {};
-  for (const dateStr of datesToCheck) {
-    try {
-      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}&limit=50`);
-      const data = await r.json();
-      for (const ev of (data.events || [])) {
-        const comp = ev.competitions?.[0];
-        const teams = comp?.competitors || [];
-        const homeT = teams.find(t => t.homeAway === 'home');
-        const awayT = teams.find(t => t.homeAway === 'away');
-        if (!homeT || !awayT) continue;
-        const home = normalize(homeT.team?.abbreviation || '');
-        const away = normalize(awayT.team?.abbreviation || '');
-        const homeScore = parseInt(homeT.score || 0);
-        const awayScore = parseInt(awayT.score || 0);
-        if (!homeScore && !awayScore) continue;
-        // Accept completed games OR games where scores differ (final)
-        const isComplete = comp?.status?.type?.completed || homeScore !== awayScore;
-        if (!isComplete) continue;
-        resultsMap[`${home}_${away}`] = { homeScore, awayScore, homeWon: homeScore > awayScore };
-      }
-    } catch(e) { console.warn('ESPN fetch failed', dateStr, e); }
-  }
+  showToast('Checking ESPN scores...', 'info', 2000);
 
   let checked = 0;
   for (const pred of pending) {
-    const key = `${normalize(pred.home)}_${normalize(pred.away)}`;
-    const result = resultsMap[key];
-    if (result) {
-      const pickWon = normalize(pred.pick) === normalize(pred.home) ? result.homeWon : !result.homeWon;
-      pred.result = pickWon ? 'win' : 'loss';
-      pred.homeScore = result.homeScore;
-      pred.awayScore = result.awayScore;
-      checked++;
-    }
+    try {
+      // Use today's scoreboard offset — try to find the game
+      const dateStr = pred.date.replace(/-/g, '');
+      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}`);
+      const data = await r.json();
+      const events = data.events || [];
+
+      for (const ev of events) {
+        const comps = ev.competitions?.[0];
+        if (!comps) continue;
+        const teams = comps.competitors || [];
+        const homeT = teams.find(t => t.homeAway === 'home');
+        const awayT = teams.find(t => t.homeAway === 'away');
+        if (!homeT || !awayT) continue;
+
+        const homeAbbr = homeT.team?.abbreviation || '';
+        const awayAbbr = awayT.team?.abbreviation || '';
+
+        const matchesGame = (
+          homeAbbr === pred.home || homeAbbr.includes(pred.home) || pred.home.includes(homeAbbr)
+        ) && (
+          awayAbbr === pred.away || awayAbbr.includes(pred.away) || pred.away.includes(awayAbbr)
+        );
+
+        if (!matchesGame) continue;
+
+        const status = comps.status?.type?.completed;
+        if (!status) continue; // game not finished
+
+        const homeScore = parseInt(homeT.score || 0);
+        const awayScore = parseInt(awayT.score || 0);
+
+        if (homeScore === awayScore) continue; // tie/no data
+
+        const homeWon = homeScore > awayScore;
+        const pickWon = (pred.pick === pred.home && homeWon) || (pred.pick === pred.away && !homeWon);
+
+        pred.result = pickWon ? 'win' : 'loss';
+        pred.homeScore = homeScore;
+        pred.awayScore = awayScore;
+        checked++;
+        break;
+      }
+    } catch(e) { console.warn('Score check failed:', e); }
   }
 
   savePredictions();
   renderTracker();
   if (checked > 0) showToast(`${checked} result${checked>1?'s':''} updated`, 'success');
-  else showToast('No final scores found yet — use W/L buttons to log manually', 'info');
+  else showToast('No completed games found yet', 'info');
 }
 
 function clearTracker() {
@@ -3006,10 +2963,6 @@ function renderTracker() {
         <span class="fs9 cd3">${p.modelPct}%</span>
         ${confTag(p.conf)}
         ${resultBadge}
-        ${p.result === 'pending' ? `
-          <button class="btn" style="padding:2px 7px;font-size:9px;background:var(--gb);border-color:rgba(0,245,196,0.2);color:var(--g)" onclick="markResult('${p.key}','win')">W</button>
-          <button class="btn" style="padding:2px 7px;font-size:9px;background:var(--rb);border-color:rgba(255,107,107,0.2);color:var(--r)" onclick="markResult('${p.key}','loss')">L</button>
-        ` : ''}
         <button class="btn-d" style="padding:2px 6px;font-size:9px" onclick="deletePred('${p.key}')">✕</button>
       </div>
     </div>`;
@@ -3017,11 +2970,6 @@ function renderTracker() {
 
   const listEl = el('tracker-list');
   if (listEl) listEl.innerHTML = listHtml;
-}
-
-function markResult(key, result) {
-  const pred = predictions.find(p => p.key === key);
-  if (pred) { pred.result = result; savePredictions(); renderTracker(); }
 }
 
 function deletePred(key) {
