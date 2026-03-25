@@ -1981,29 +1981,6 @@ function getMinTrendBadge(p) {
   return '';
 }
 
-function getMinTrendBadge(p) {
-  if (!p.min || !p.szn) return '';
-  const minDiff = p.min - (p.szn / p.szn * p.min); // L10 avg min
-  // Compare L10 avg minutes vs what we'd expect from season role
-  // If min field (L10 avg) is significantly lower than typical starter load
-  const seasonMin = p.min; // this is already L10 avg from bridge
-  // We need to detect if recent minutes are trending down
-  // Use the note field L5 scores as proxy — if scoring down AND minutes down
-  if (!p.note) return '';
-  const match = p.note.match(/L5: ([\d,]+)/);
-  if (!match) return '';
-  const l5games = match[1].split(',').map(Number);
-  const l5avg = l5games.reduce((a,b) => a+b, 0) / l5games.length;
-  
-  // If L10 avg minutes < 28 and season avg scoring suggests they should play more
-  if (p.min < 25 && p.szn > 12) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
-  if (p.min > 0 && p.szn > 0) {
-    const minRatio = p.min / 32;
-    if (minRatio < 0.75 && p.szn > 15) return '<span class="tg" style="background:rgba(255,200,50,0.1);color:var(--y)">⚠️ MIN↓</span>';
-  }
-  return '';
-}
-
 // ═══════════════════════════════════════════════════════
 // DATA LOADER
 // ═══════════════════════════════════════════════════════
@@ -2506,6 +2483,22 @@ function removeManualInjury(name) {
   manualInjuries = manualInjuries.filter(x => x.name !== name);
   renderManualInjuries();
   renderAll();
+}
+
+function renderManualInjuries() {
+  const container = el('manual-injuries-list');
+  if (!container) return;
+  if (!manualInjuries.length) { container.innerHTML = '<div class="fs8 cd4">No manual injuries added</div>'; return; }
+  container.innerHTML = manualInjuries.map(x =>
+    `<div class="flex-b" style="padding:4px 0;border-bottom:1px solid var(--bd)">
+      <div>
+        <span class="fs9 fw7">${x.name}</span>
+        <span class="tg" style="background:${x.status==='OUT'?'var(--rb)':x.status==='GTD'?'var(--yb)':'var(--gb)'};color:${x.status==='OUT'?'var(--r)':x.status==='GTD'?'var(--y)':'var(--g)'};margin-left:4px">${x.status}</span>
+        <span class="fs8 cd3" style="margin-left:4px">${x.team} · ${x.star?'⭐ Star':x.starter?'Starter':'Bench'}</span>
+      </div>
+      <button class="btn-d" onclick="removeManualInjury('${x.name}')">✕</button>
+    </div>`
+  ).join('');
 }
 
 // ── GLOWING CARD BORDER (mouse tracking) ──
