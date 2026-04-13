@@ -30,7 +30,7 @@ CORS(app)
 # ─── AUTHENTICATION ───────────────────────────────────
 config = Configuration(host="https://api.elections.kalshi.com/trade-api/v2")
 config.api_key_id = "5a3ad6f1-a741-42a3-8ce6-20ce32529d7a"
-with open("thirdAPIKEY.txt", "r") as f:
+with open("thirdAPIKEY_converted.txt", "r") as f:
     config.private_key_pem = f.read()
 client = KalshiClient(config)
 
@@ -85,33 +85,53 @@ def search_markets():
     series = request.args.get('series', '')
     try:
         auth = KalshiAuth(config.api_key_id, config.private_key_pem)
-        
-        params = {"limit": limit}
+
+        # Base params — always filter to open markets only
+        base_params = {"limit": 200, "status": "open"}
         if series:
-            params["series_ticker"] = series
-        if query and query.startswith('KXNBA2D'):
-            params["tickers"] = query
+            # series_ticker filters server-side (works for exact series IDs)
+            base_params["series_ticker"] = series
 
         url = 'https://api.elections.kalshi.com/trade-api/v2/markets'
-        headers = auth.create_auth_headers('GET', '/trade-api/v2/markets')
-        headers['Content-Type'] = 'application/json'
 
-        r = req.get(url, headers=headers, params=params)
-        data = r.json()
-        markets_raw = data.get('markets', [])
+        def fetch_page(cursor=None):
+            p = dict(base_params)
+            if cursor:
+                p["cursor"] = cursor
+            h = auth.create_auth_headers('GET', '/trade-api/v2/markets')
+            h['Content-Type'] = 'application/json'
+            return req.get(url, headers=h, params=p).json()
 
+        # For keyword searches, paginate up to 5 pages (1000 markets) so we
+        # don't miss NBA markets that sit beyond the first 200 results.
+        # For no-keyword calls (just series filter) one page is enough.
+        markets_raw = []
+        data = fetch_page()
+        markets_raw.extend(data.get('markets', []))
+
+        if query:
+            cursor = data.get('cursor')
+            for _ in range(4):          # up to 4 more pages = 1000 markets total
+                if not cursor:
+                    break
+                data = fetch_page(cursor)
+                batch = data.get('markets', [])
+                markets_raw.extend(batch)
+                cursor = data.get('cursor') if batch else None
+
+        # Client-side text filter (only when a query term is given)
         if query:
             q_lower = query.lower()
             markets_raw = [m for m in markets_raw if
-                q_lower in m.get('ticker','').lower() or
-                q_lower in m.get('title','').lower()]
+                q_lower in m.get('ticker', '').lower() or
+                q_lower in m.get('title', '').lower()]
 
         results = []
-        for m in markets_raw:
+        for m in markets_raw[:limit]:   # honour the caller's requested limit
             results.append({
-                "ticker": m.get('ticker',''),
-                "title": m.get('title',''),
-                "subtitle": m.get('subtitle',''),
+                "ticker": m.get('ticker', ''),
+                "title": m.get('title', ''),
+                "subtitle": m.get('subtitle', ''),
                 "yes_bid": m.get('yes_bid'),
                 "yes_ask": m.get('yes_ask'),
                 "no_bid": m.get('no_bid'),
@@ -119,12 +139,44 @@ def search_markets():
                 "last_price": m.get('last_price'),
                 "volume": m.get('volume') or 0,
                 "open_interest": m.get('open_interest') or 0,
-                "status": m.get('status',''),
-                "close_time": m.get('close_time',''),
+                "status": m.get('status', ''),
+                "close_time": m.get('close_time', ''),
             })
         return jsonify({"count": len(results), "markets": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+@app.route('/debug-search', methods=['GET'])
+def debug_search():
+    """Hit /debug-search?q=nba in your browser to see raw Kalshi ticker names.
+    Helps identify the correct series prefix (KXNBA2D, NBAP, etc.)"""
+    import requests as req
+    from kalshi_python_sync.auth import KalshiAuth
+    query = request.args.get('q', 'nba').lower()
+    try:
+        auth = KalshiAuth(config.api_key_id, config.private_key_pem)
+        url = 'https://api.elections.kalshi.com/trade-api/v2/markets'
+        h = auth.create_auth_headers('GET', '/trade-api/v2/markets')
+        h['Content-Type'] = 'application/json'
+        r = req.get(url, headers=h, params={"limit": 200, "status": "open"}).json()
+        all_markets = r.get('markets', [])
+        matches = [
+            {"ticker": m.get('ticker'), "title": m.get('title'), "status": m.get('status')}
+            for m in all_markets
+            if query in m.get('ticker', '').lower() or query in m.get('title', '').lower()
+        ]
+        # Also return the first 5 raw tickers so you can see the naming pattern
+        sample = [m.get('ticker') for m in all_markets[:10]]
+        return jsonify({
+            "query": query,
+            "total_open_markets_page1": len(all_markets),
+            "matches": matches,
+            "sample_tickers_first_10": sample,
+            "cursor": r.get('cursor')
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
 
 @app.route('/orderbook/<ticker>', methods=['GET'])
 def get_orderbook(ticker):
@@ -263,9 +315,9 @@ def fetch_espn():
         # ─── STEP 1: Today's scheduled games ───
         sb = req.get(f'{ESPN}/scoreboard?dates={today}', timeout=5).json()
         events = sb.get('events', [])
-        scheduled = [e for e in events if e['status']['type']['state'] == 'pre']
+        scheduled = events  # include pre, in, and post (all games today)
         if not scheduled:
-            return jsonify({"error": "No games scheduled for today"}), 404
+            return jsonify({"error": "No games found for today — try offset=1 for tomorrow"}), 404
 
         # ─── STEP 2: Build team ID map ───
         team_ids = {}
@@ -286,22 +338,37 @@ def fetch_espn():
             away = next((c for c in competitors if c['homeAway'] == 'away'), competitors[1])
             h_abbr = fix_abbr(home['team']['abbreviation'])
             a_abbr = fix_abbr(away['team']['abbreviation'])
+            state = event['status']['type']['state']
+            completed = comp['status']['type'].get('completed', False)
             try:
                 dt = datetime.fromisoformat(event.get('date', '').replace('Z', '+00:00'))
                 dt_et = dt.astimezone(pytz.timezone('America/New_York'))
                 game_time = dt_et.strftime('%-I:%M %p')
             except:
                 game_time = ''
-            games.append({
+            game = {
                 "id": f"g{i+1}",
                 "h": h_abbr, "a": a_abbr,
                 "t": game_time,
+                "state": state,
+                "completed": completed,
                 "hp": 50, "ap": 50,
                 "kH": 50, "kA": 50,
                 "h2h": [1, 1],
                 "hRest": 1, "aRest": 1,
                 "hTravel": False, "aTravel": False
-            })
+            }
+            if state in ('in', 'post'):
+                try:
+                    game["hScore"] = int(home.get('score', 0) or 0)
+                    game["aScore"] = int(away.get('score', 0) or 0)
+                    if state == 'in':
+                        period = comp['status'].get('period', 1)
+                        clock = comp['status'].get('displayClock', '')
+                        game["liveStatus"] = f"Q{period} {clock}".strip()
+                except:
+                    pass
+            games.append(game)
 
         # ─── STEP 4: Fetch team stats + record + roster + injuries in parallel ───
         def fetch_team_data(abbr, info):
@@ -459,9 +526,9 @@ def fetch_espn_deep():
         # ─── STEP 1: Today's scheduled games ───
         sb = req.get(f'{ESPN}/scoreboard?dates={today}', timeout=5).json()
         events = sb.get('events', [])
-        scheduled = [e for e in events if e['status']['type']['state'] == 'pre']
+        scheduled = events  # include pre, in, and post (all games today)
         if not scheduled:
-            return jsonify({"error": "No games scheduled for today"}), 404
+            return jsonify({"error": "No games found for today — try offset=1 for tomorrow"}), 404
 
         # ─── STEP 2: Build team ID map ───
         team_ids = {}
@@ -482,22 +549,37 @@ def fetch_espn_deep():
             away = next((c for c in competitors if c['homeAway'] == 'away'), competitors[1])
             h_abbr = fix_abbr(home['team']['abbreviation'])
             a_abbr = fix_abbr(away['team']['abbreviation'])
+            state = event['status']['type']['state']
+            completed = comp['status']['type'].get('completed', False)
             try:
                 dt = datetime.fromisoformat(event.get('date', '').replace('Z', '+00:00'))
                 dt_et = dt.astimezone(pytz.timezone('America/New_York'))
                 game_time = dt_et.strftime('%-I:%M %p')
             except:
                 game_time = ''
-            games.append({
+            game = {
                 "id": f"g{i+1}",
                 "h": h_abbr, "a": a_abbr,
                 "t": game_time,
+                "state": state,
+                "completed": completed,
                 "hp": 50, "ap": 50,
                 "kH": 50, "kA": 50,
                 "h2h": [1, 1],
                 "hRest": 1, "aRest": 1,
                 "hTravel": False, "aTravel": False
-            })
+            }
+            if state in ('in', 'post'):
+                try:
+                    game["hScore"] = int(home.get('score', 0) or 0)
+                    game["aScore"] = int(away.get('score', 0) or 0)
+                    if state == 'in':
+                        period = comp['status'].get('period', 1)
+                        clock = comp['status'].get('displayClock', '')
+                        game["liveStatus"] = f"Q{period} {clock}".strip()
+                except:
+                    pass
+            games.append(game)
 
         # ─── STEP 4: Deep fetch per team ───
         def fetch_team_deep(abbr, info):
