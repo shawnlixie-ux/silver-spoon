@@ -1,0 +1,103 @@
+# PARLAY LAB — IMPROVEMENT LOG
+# Each version can be rolled back independently
+# ═══════════════════════════════════════════════════
+
+## V1 — BASELINE (original)
+### Model A (Efficiency):
+- Net rating difference × 0.028
+- Home court +3%
+### Model B (Record):
+- Win percentage difference × 0.55
+- Home court +3%
+### Props:
+- Base = L5 × 0.6 + Season × 0.4
+- Opponent DRTG adjustment
+- Pace adjustment
+- Home/away +/- 0.8 pts
+- Blowout risk: -6% if net gap > 12
+### Dual System:
+- Consensus = both models agree direction
+- Weight: A=60%, B=40%
+
+---
+
+## V2 — 3 MODELS + SHOW MATH (current build)
+
+### MODEL A — EFFICIENCY (weight: 40%)
+Variables:
+1. Offensive matchup: team ORTG vs opponent DRTG
+2. Defensive matchup: team DRTG vs opponent ORTG
+3. Pace variance: fast games → pull toward 50% (more possessions = more randomness)
+4. Injury impact: star OUT → degrade team net rating by estimated on/off value
+5. Rest penalty: B2B = -2%, 3-in-4 nights = -1.5%
+6. Travel fatigue: coast-to-coast flag = -1%
+7. Home court advantage: +3%
+
+### MODEL B — MOMENTUM (weight: 30%)
+Variables:
+1. L10 record (recent form, not full season)
+2. Scoring trend: L10 PPG vs season PPG (team getting hotter or colder?)
+3. Win/loss streak bonus: W3+ = +1%, W5+ = +2%, L3+ = -1%, L5+ = -2%
+4. Home/away record split (not overall — specific to venue type)
+5. ATS L10 record (beating market expectations = undervalued)
+
+### MODEL C — MATCHUP (weight: 30%)
+Variables:
+1. Season series H2H record between these two teams
+2. Style clash: 3pt rate mismatch (3pt-heavy vs interior = variance)
+3. Close game record: games within 5 pts (clutch factor)
+4. Pace mismatch penalty: if pace difference > 4 → more variance
+
+### CONSENSUS SYSTEM:
+- 3/3 agree = HIGH CONFIDENCE (🟢)
+- 2/3 agree = MEDIUM (🟡)
+- 0-1/3 agree = LOW (🔴)
+- 3/3 agree + edge > 10% = LOCK (🔥)
+
+### PROPS ENGINE V2:
+- Base = L10 × 0.45 + Season × 0.35 + L5 × 0.20
+- Opponent DRTG adjustment (scaled)
+- Pace adjustment
+- Home/away split
+- Blowout risk (net gap > 12 = -6%)
+- Injury usage boost (teammate OUT → redistribute)
+- B2B penalty: -6%
+
+### SHOW MATH:
+- Toggle on each game card
+- Shows full breakdown of each model's calculation
+- Shows final weighted average and confidence tier
+
+### JSON FORMAT ADDITIONS:
+Teams now include:
+- l10w, l10l (last 10 record)
+- hw, hl (home record)
+- aw, al (away record)
+- streak (positive = win streak, negative = loss streak)
+- ptsFor, ptsAg (season PPG for/against)
+- l10ptsFor (L10 PPG)
+- tpr (3-point rate)
+- atsl10 (ATS record last 10 — wins vs spread)
+- closew, closel (record in games within 5 pts)
+
+Games now include:
+- h2h (season series: [homeWins, awayWins])
+- hRest, aRest (days rest: 0=B2B, 1=normal, 2+=well rested)
+- hTravel, aTravel (boolean: coast-to-coast)
+
+Players now include:
+- l10 (last 10 games average)
+
+---
+
+## V3 — FUTURE IDEAS (not yet built)
+- Bet tracker with P&L history
+- Correlation warnings for same-game bets
+- Auto-sort props by edge size
+- Altitude adjustment for Denver games
+- Referee assignment tendencies
+- Player vs specific team historical performance
+- Foul trouble risk for bigs
+- Usage rate WITH vs WITHOUT specific teammates
+- Bankroll drawdown protection
+- Minutes projection model (not just points)

@@ -1,33 +1,28 @@
 #!/bin/bash
-echo "🏀 Starting Parlay Lab..."
+echo "🏀 Starting Delta..."
 
-# Start bridge in background
+lsof -ti:8080 | xargs kill -9 2>/dev/null
+sleep 1
+
 cd "/Applications/Betting Project/API Keys/circlingdiamond45 (read)"
 python3 bridge.py &
 BRIDGE_PID=$!
 echo "✅ Bridge started (PID: $BRIDGE_PID)"
-
-# Wait for bridge to start
 sleep 2
 
-# Start HTML server in background
 cd "/Applications/Betting Project"
 python3 -m http.server 8080 &
 SERVER_PID=$!
-echo "✅ HTML server started (PID: $SERVER_PID)"
-
-# Wait and check bridge
+echo "✅ Server started (PID: $SERVER_PID)"
 sleep 1
-echo "🔍 Checking bridge..."
-curl -s http://127.0.0.1:5001/status
 
-echo ""
+open "http://127.0.0.1:8080/Delta.html"
+
 echo "═══════════════════════════════════════"
-echo "  PARLAY LAB RUNNING"
-echo "  Open: http://127.0.0.1:8080/Parlay_Lab_Kalshi%20current.html"
+echo "  DELTA RUNNING"
+echo "  Open: http://127.0.0.1:8080/Delta.html"
 echo "  To stop: press Ctrl+C"
 echo "═══════════════════════════════════════"
 
-# Keep script running — Ctrl+C kills everything
-trap "kill $BRIDGE_PID $SERVER_PID; echo 'Stopped.'" EXIT
+trap "kill $BRIDGE_PID $SERVER_PID 2>/dev/null; echo 'Stopped.'" EXIT
 wait

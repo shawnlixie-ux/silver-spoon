@@ -1,0 +1,91 @@
+{
+  "date": "Tue Mar 17, 2026",
+  "games": [
+    {"id":"g1","h":"CHA","a":"MIA","t":"7:00 PM","hp":55,"ap":45,"kH":null,"kA":null},
+    {"id":"g2","h":"ORL","a":"OKC","t":"7:00 PM","hp":30,"ap":70,"kH":null,"kA":null},
+    {"id":"g3","h":"WAS","a":"DET","t":"7:00 PM","hp":15,"ap":85,"kH":null,"kA":null},
+    {"id":"g4","h":"NYK","a":"IND","t":"7:30 PM","hp":85,"ap":15,"kH":null,"kA":null},
+    {"id":"g5","h":"MIL","a":"CLE","t":"8:00 PM","hp":35,"ap":65,"kH":null,"kA":null},
+    {"id":"g6","h":"MIN","a":"PHX","t":"8:00 PM","hp":60,"ap":40,"kH":null,"kA":null},
+    {"id":"g7","h":"DEN","a":"PHI","t":"10:00 PM","hp":80,"ap":20,"kH":null,"kA":null},
+    {"id":"g8","h":"SAC","a":"SAS","t":"10:00 PM","hp":20,"ap":80,"kH":null,"kA":null}
+  ],
+  "teams": {
+    "ATL":{"ortg":115.2,"drtg":114.1,"pace":101.9,"w":36,"l":31,"net":1.1},
+    "BOS":{"ortg":120.3,"drtg":112.7,"pace":94.7,"w":44,"l":23,"net":7.6},
+    "BKN":{"ortg":109.9,"drtg":119.0,"pace":96.7,"w":17,"l":50,"net":-9.1},
+    "CHA":{"ortg":118.4,"drtg":115.1,"pace":97.1,"w":34,"l":34,"net":3.3},
+    "CHI":{"ortg":113.3,"drtg":117.7,"pace":101.6,"w":27,"l":40,"net":-4.4},
+    "CLE":{"ortg":118.5,"drtg":114.3,"pace":100.0,"w":41,"l":27,"net":4.2},
+    "DAL":{"ortg":110.7,"drtg":115.5,"pace":101.5,"w":23,"l":45,"net":-4.8},
+    "DEN":{"ortg":121.6,"drtg":117.6,"pace":98.1,"w":41,"l":27,"net":4.0},
+    "DET":{"ortg":117.3,"drtg":109.9,"pace":99.4,"w":48,"l":19,"net":7.4},
+    "GSW":{"ortg":111.0,"drtg":111.8,"pace":100.8,"w":32,"l":35,"net":-0.8},
+    "HOU":{"ortg":115.8,"drtg":111.5,"pace":97.1,"w":41,"l":25,"net":4.3},
+    "IND":{"ortg":104.3,"drtg":116.3,"pace":101.3,"w":15,"l":53,"net":-12.0},
+    "LAC":{"ortg":112.8,"drtg":113.5,"pace":97.6,"w":34,"l":33,"net":-0.7},
+    "LAL":{"ortg":115.5,"drtg":110.8,"pace":99.0,"w":42,"l":25,"net":4.7},
+    "MEM":{"ortg":107.8,"drtg":114.6,"pace":98.9,"w":23,"l":43,"net":-6.8},
+    "MIA":{"ortg":115.3,"drtg":112.9,"pace":96.5,"w":38,"l":30,"net":2.4},
+    "MIL":{"ortg":110.7,"drtg":114.1,"pace":99.7,"w":28,"l":39,"net":-3.4},
+    "MIN":{"ortg":115.1,"drtg":110.4,"pace":97.8,"w":41,"l":27,"net":4.7},
+    "NOP":{"ortg":106.9,"drtg":114.1,"pace":99.4,"w":22,"l":46,"net":-7.2},
+    "NYK":{"ortg":116.9,"drtg":111.6,"pace":97.2,"w":44,"l":25,"net":5.3},
+    "OKC":{"ortg":118.4,"drtg":107.5,"pace":99.8,"w":53,"l":15,"net":10.9},
+    "ORL":{"ortg":114.2,"drtg":111.3,"pace":96.3,"w":38,"l":28,"net":2.9},
+    "PHI":{"ortg":115.0,"drtg":112.4,"pace":97.5,"w":37,"l":31,"net":2.6},
+    "PHX":{"ortg":113.4,"drtg":111.0,"pace":99.3,"w":39,"l":28,"net":2.4},
+    "POR":{"ortg":109.2,"drtg":111.0,"pace":100.2,"w":32,"l":36,"net":-1.8},
+    "SAC":{"ortg":105.9,"drtg":114.5,"pace":101.1,"w":18,"l":51,"net":-8.6},
+    "SAS":{"ortg":117.2,"drtg":106.8,"pace":99.6,"w":49,"l":18,"net":10.4},
+    "TOR":{"ortg":113.5,"drtg":111.2,"pace":98.1,"w":38,"l":29,"net":2.3},
+    "UTA":{"ortg":107.2,"drtg":115.6,"pace":98.8,"w":20,"l":48,"net":-8.4},
+    "WAS":{"ortg":104.5,"drtg":114.9,"pace":99.9,"w":16,"l":50,"net":-10.4}
+  },
+  "players": [
+    {"name":"Bam Adebayo","team":"MIA","opp":"CHA","pos":"C","szn":22.0,"l5":22.0,"min":34.5,"line":22.5,"status":"PLAY","note":"Had 83-pt game vs WAS Mar 11. MIA centerpiece. CHA allows 115.1 DRTG"},
+    {"name":"Norman Powell","team":"MIA","opp":"CHA","pos":"SG","szn":18.5,"l5":18.5,"min":32.0,"line":18.5,"status":"PLAY","note":"Traded from LAC to MIA. Consistent scorer"},
+    {"name":"LaMelo Ball","team":"CHA","opp":"MIA","pos":"PG","szn":23.0,"l5":23.0,"min":33.5,"line":23.5,"status":"PLAY","note":"Injury-prone but high ceiling. Hit LeBron milestone recently"},
+    {"name":"Brandon Miller","team":"CHA","opp":"MIA","pos":"SF","szn":18.0,"l5":18.0,"min":33.0,"line":18.5,"status":"PLAY","note":"Sophomore year. Solid second option"},
+
+    {"name":"Shai Gilgeous-Alexander","team":"OKC","opp":"ORL","pos":"PG","szn":31.8,"l5":31.8,"min":34.5,"line":30.5,"status":"PLAY","note":"Reigning MVP. 55.4 FG%. ORL missing Wagner — weaker D"},
+    {"name":"Jalen Williams","team":"OKC","opp":"ORL","pos":"SF","szn":21.0,"l5":21.0,"min":33.5,"line":20.5,"status":"PLAY","note":"All-Star. OKC's #2 option. Efficient two-way wing"},
+    {"name":"Paolo Banchero","team":"ORL","opp":"OKC","pos":"PF","szn":22.3,"l5":24.8,"min":35.0,"line":22.5,"status":"PLAY","note":"27 pts last game. Wagner OUT. Carrying ORL offense"},
+    {"name":"Desmond Bane","team":"ORL","opp":"OKC","pos":"SG","szn":18.0,"l5":18.0,"min":33.0,"line":18.5,"status":"PLAY","note":"Traded from MEM to ORL. Second scoring option"},
+
+    {"name":"Cade Cunningham","team":"DET","opp":"WAS","pos":"PG","szn":24.0,"l5":24.0,"min":35.5,"line":24.5,"status":"PLAY","note":"MVP candidate. DET is 48-19 #1 East. WAS worst D in league"},
+    {"name":"Trae Young","team":"WAS","opp":"DET","pos":"PG","szn":17.7,"l5":14.8,"min":25.9,"line":17.5,"status":"PLAY","note":"11 pts last game. Tanking team, reduced minutes"},
+
+    {"name":"Jalen Brunson","team":"NYK","opp":"IND","pos":"PG","szn":26.0,"l5":26.0,"min":34.5,"line":25.5,"status":"PLAY","note":"30 pts vs GSW recently. NYK's engine. IND worst D in East"},
+    {"name":"Karl-Anthony Towns","team":"NYK","opp":"IND","pos":"C","szn":22.0,"l5":22.0,"min":34.0,"line":22.5,"status":"PLAY","note":"Reliable second option. IND allows 116.3 DRTG"},
+    {"name":"Pascal Siakam","team":"IND","opp":"NYK","pos":"PF","szn":22.0,"l5":22.0,"min":34.5,"line":22.5,"status":"PLAY","note":"IND's top option with Haliburton OUT (Achilles). Carries the load"},
+
+    {"name":"Donovan Mitchell","team":"CLE","opp":"MIL","pos":"SG","szn":25.0,"l5":25.0,"min":34.0,"line":24.5,"status":"PLAY","note":"Returned from groin absence. CLE's go-to scorer. MIL allows 114.1"},
+    {"name":"Giannis Antetokounmpo","team":"MIL","opp":"CLE","pos":"PF","szn":30.0,"l5":30.0,"min":35.5,"line":29.5,"status":"PLAY","note":"Two-time MVP. 9.9 2PT FG/game. MIL struggling at 28-39"},
+    {"name":"Myles Turner","team":"MIL","opp":"CLE","pos":"C","szn":14.0,"l5":14.0,"min":28.0,"line":14.5,"status":"PLAY","note":"Traded from IND. Rim protector, catch-and-shoot 3s"},
+
+    {"name":"Anthony Edwards","team":"MIN","opp":"PHX","pos":"SG","szn":26.0,"l5":26.0,"min":35.5,"line":26.5,"status":"PLAY","note":"MIN's franchise player. PHX allows 111.0 DRTG — average"},
+    {"name":"Julius Randle","team":"MIN","opp":"PHX","pos":"PF","szn":22.0,"l5":22.0,"min":33.0,"line":21.5,"status":"PLAY","note":"Solid second scorer. Consistent 20+ nightly"},
+    {"name":"Devin Booker","team":"PHX","opp":"MIN","pos":"SG","szn":25.0,"l5":25.0,"min":35.0,"line":25.5,"status":"PLAY","note":"PHX #1 scorer with KD traded to HOU. MIN has elite D (110.4)"},
+
+    {"name":"Nikola Jokic","team":"DEN","opp":"PHI","pos":"C","szn":26.0,"l5":26.0,"min":34.5,"line":25.5,"status":"PLAY","note":"Three-time MVP. Triple-double machine. PHI allows 112.4 DRTG"},
+    {"name":"Jamal Murray","team":"DEN","opp":"PHI","pos":"PG","szn":24.0,"l5":24.0,"min":34.0,"line":23.5,"status":"PLAY","note":"603 3PM — 8th in NBA. DEN's #2 scorer"},
+    {"name":"Tyrese Maxey","team":"PHI","opp":"DEN","pos":"PG","szn":27.0,"l5":27.0,"min":37.0,"line":26.5,"status":"PLAY","note":"720 3PM — MOST in NBA. Carries PHI. DEN altitude factor"},
+
+    {"name":"Victor Wembanyama","team":"SAS","opp":"SAC","pos":"C","szn":24.5,"l5":25.8,"min":34.8,"line":25.5,"status":"PLAY","note":"DPOY candidate. SAS 15-1 last 16. SAC worst team in West"},
+    {"name":"De'Aaron Fox","team":"SAS","opp":"SAC","pos":"PG","szn":19.1,"l5":18.5,"min":31.6,"line":19.5,"status":"PLAY","note":"Revenge game vs former team SAC. Traded midseason"},
+    {"name":"Stephon Castle","team":"SAS","opp":"SAC","pos":"PG","szn":16.6,"l5":16.0,"min":29.8,"line":16.5,"status":"PLAY","note":"ROY winner. Facilitator. 15 pts 10 ast last game"},
+    {"name":"DeMar DeRozan","team":"SAC","opp":"SAS","pos":"SF","szn":23.0,"l5":23.0,"min":34.0,"line":22.5,"status":"PLAY","note":"SAC's top scorer. SAS has elite D (106.8 DRTG) — tough matchup"},
+    {"name":"Domantas Sabonis","team":"SAC","opp":"SAS","pos":"C","szn":18.0,"l5":18.0,"min":34.0,"line":18.5,"status":"PLAY","note":"Double-double machine. Scoring down from last year"}
+  ],
+  "injuries": {
+    "ORL":[{"p":"Franz Wagner","s":"OUT"},{"p":"Jonathan Isaac","s":"OUT"}],
+    "IND":[{"p":"Tyrese Haliburton","s":"OUT"}],
+    "OKC":[{"p":"Shai Gilgeous-Alexander","s":"PLAY"}],
+    "WAS":[{"p":"Anthony Davis","s":"OUT"}],
+    "MIA":[{"p":"Tyler Herro","s":"GTD"}],
+    "PHI":[{"p":"Joel Embiid","s":"GTD"},{"p":"Paul George","s":"GTD"}],
+    "LAC":[{"p":"Kawhi Leonard","s":"OUT"}],
+    "MIL":[{"p":"Damian Lillard","s":"OUT"}]
+  }
+}

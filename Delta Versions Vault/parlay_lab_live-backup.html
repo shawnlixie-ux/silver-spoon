@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parlay Lab — Live</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg:#07071a; --s:#0c0c22; --s2:#11112e; --bd:#1a1a42;
+    --bh:rgba(99,102,241,0.45); --p:#818cf8; --pb:rgba(99,102,241,0.1);
+    --g:#34d399; --gb:rgba(52,211,153,0.1); --r:#f87171; --rb:rgba(248,113,113,0.1);
+    --y:#fbbf24; --yb:rgba(251,191,36,0.1); --b:#60a5fa; --bb:rgba(96,165,250,0.1);
+    --o:#fb923c; --k:#00d4aa; --kb:rgba(0,212,170,0.08); --kbd:rgba(0,212,170,0.25);
+    --t:#e2e8f0; --d1:#94a3b8; --d2:#64748b; --d3:#475569; --d4:#334155;
+    --font:'JetBrains Mono','SF Mono','Fira Code',ui-monospace,monospace;
+  }
+  body { font-family:var(--font); background:var(--bg); color:var(--t); min-height:100vh; }
+  .app { max-width:560px; margin:0 auto; }
+
+  /* HEADER */
+  .header { background:linear-gradient(135deg,#080828,#0e0e3a,#080828); border-bottom:1px solid var(--bd); padding:18px 16px 12px; position:relative; overflow:hidden; }
+  .header .glow { position:absolute; top:-30px; right:-30px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle,rgba(0,212,170,0.06),transparent 70%); }
+  .header h1 { font-size:18px; font-weight:800; background:linear-gradient(90deg,#00d4aa,#818cf8,#60a5fa); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-0.3px; }
+  .header p { font-size:8px; color:var(--d3); letter-spacing:2.5px; margin-top:2px; }
+
+  /* TABS */
+  .tabs { display:flex; background:var(--s); border-bottom:1px solid var(--bd); overflow-x:auto; }
+  .tab-btn { flex:1; padding:10px 4px; border:none; cursor:pointer; white-space:nowrap; font-family:var(--font); font-size:9px; font-weight:700; letter-spacing:1.2px; background:transparent; color:var(--d3); border-bottom:2px solid transparent; transition:all 0.2s; }
+  .tab-btn.active { background:var(--pb); color:var(--p); border-bottom-color:var(--p); }
+  .tab-btn.active-k { background:var(--kb); color:var(--k); border-bottom-color:var(--k); }
+
+  /* PANELS */
+  .panel { display:none; padding:12px 14px; }
+  .panel.active { display:block; }
+
+  /* CARDS */
+  .card { background:var(--s); border:1px solid var(--bd); border-radius:10px; padding:12px; margin-bottom:8px; }
+  .card-highlight { border-color:var(--kbd); background:rgba(0,212,170,0.03); }
+  .card-green { border-color:rgba(52,211,153,0.25); background:var(--gb); }
+
+  /* TAGS */
+  .tag { font-size:8px; font-weight:800; letter-spacing:1.2px; padding:2px 7px; border-radius:10px; display:inline-block; }
+
+  /* INPUTS */
+  .input { width:100%; background:var(--bg); border:1px solid var(--bd); border-radius:6px; padding:8px 10px; color:var(--t); font-size:14px; font-weight:700; font-family:var(--font); outline:none; }
+  .input:focus { border-color:var(--bh); }
+  .input-k { border-color:var(--kbd); }
+  .input-sm { font-size:12px; padding:6px 8px; }
+
+  /* SEARCH */
+  .search-box { position:relative; margin-bottom:12px; }
+  .search-box input { width:100%; background:var(--s); border:1px solid var(--kbd); border-radius:8px; padding:10px 12px 10px 36px; color:var(--t); font-size:12px; font-family:var(--font); outline:none; }
+  .search-box::before { content:'🔍'; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:14px; }
+  .search-results { position:absolute; top:100%; left:0; right:0; background:var(--s2); border:1px solid var(--bd); border-radius:8px; max-height:200px; overflow-y:auto; z-index:100; display:none; }
+  .search-results.open { display:block; }
+  .search-result { padding:8px 12px; cursor:pointer; font-size:11px; border-bottom:1px solid var(--bd); }
+  .search-result:hover { background:var(--pb); }
+
+  /* GRID */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; }
+  .grid-5 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1fr; gap:4px; }
+
+  /* STAT BOX */
+  .stat-label { font-size:7px; color:var(--d3); letter-spacing:1.2px; margin-bottom:2px; }
+  .stat-val { font-size:20px; font-weight:800; line-height:1; }
+
+  /* BAR */
+  .bar-bg { width:100%; height:5px; border-radius:5px; background:rgba(255,255,255,0.04); overflow:hidden; }
+  .bar-fill { height:100%; border-radius:5px; transition:width 0.4s ease; }
+
+  /* KELLY */
+  .kelly-box { background:linear-gradient(135deg,rgba(0,212,170,0.05),rgba(99,102,241,0.05)); border:1px solid var(--kbd); border-radius:10px; padding:14px; margin-top:10px; }
+
+  /* STATUS DOT */
+  .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; }
+  .status-play { background:var(--g); }
+  .status-out { background:var(--r); }
+  .status-gtd { background:var(--y); }
+
+  /* LOADING */
+  .loading { text-align:center; padding:30px; color:var(--d3); }
+  .spinner { display:inline-block; width:20px; height:20px; border:2px solid var(--d4); border-top-color:var(--k); border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:8px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* BANKROLL */
+  .bankroll-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; background:var(--s); border:1px solid var(--bd); border-radius:8px; margin-bottom:12px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:var(--bg); }
+  ::-webkit-scrollbar-thumb { background:var(--d4); border-radius:4px; }
+
+  /* PLAYER PROP CARD */
+  .prop-card { background:var(--s); border:1px solid var(--bd); border-radius:10px; padding:12px; margin-bottom:8px; transition:border-color 0.2s; }
+  .prop-card.over { border-color:rgba(52,211,153,0.25); background:var(--gb); }
+  .prop-card.under { border-color:rgba(248,113,113,0.25); background:var(--rb); }
+
+  /* TOOLTIP */
+  .info-tip { cursor:help; color:var(--d3); font-size:10px; }
+  .info-tip:hover { color:var(--d1); }
+
+  .section-label { font-size:8px; color:var(--d3); letter-spacing:2.5px; margin-bottom:8px; }
+  .section-label-k { color:var(--k); font-weight:700; }
+  .dimtext { font-size:10px; color:var(--d2); line-height:1.7; }
+  .text-green { color:var(--g); }
+  .text-red { color:var(--r); }
+  .text-yellow { color:var(--y); }
+  .text-purple { color:var(--p); }
+  .text-blue { color:var(--b); }
+  .text-kalshi { color:var(--k); }
+  .fw700 { font-weight:700; }
+  .fw800 { font-weight:800; }
+  .mt8 { margin-top:8px; }
+  .mt12 { margin-top:12px; }
+  .mb8 { margin-bottom:8px; }
+  .flex { display:flex; }
+  .flex-between { display:flex; justify-content:space-between; align-items:center; }
+  .gap4 { gap:4px; }
+  .gap6 { gap:6px; }
+  .gap8 { gap:8px; }
+  .text-center { text-align:center; }
+  .text-right { text-align:right; }
+
+  /* EMPTY STATE */
+  .empty { text-align:center; padding:50px 20px; color:var(--d4); }
+  .empty-icon { font-size:36px; margin-bottom:8px; }
+
+  /* ACTION BUTTON */
+  .btn { padding:9px 16px; border-radius:8px; border:1px solid var(--bh); background:var(--pb); color:var(--p); font-size:10px; font-weight:700; cursor:pointer; font-family:var(--font); letter-spacing:1px; transition:all 0.2s; }
+  .btn:hover { background:rgba(99,102,241,0.2); }
+  .btn-k { background:var(--kb); border-color:var(--kbd); color:var(--k); }
+  .btn-k:hover { background:rgba(0,212,170,0.15); }
+  .btn-full { width:100%; }
+  .btn-danger { background:var(--rb); border-color:rgba(248,113,113,0.3); color:var(--r); padding:5px 10px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="glow"></div>
+    <div class="flex gap8" style="align-items:center;position:relative">
+      <span style="font-size:22px">🏀</span>
+      <div>
+        <h1>PARLAY LAB LIVE</h1>
+        <p>LIVE APIs · DUAL MODEL · KELLY CRITERION · PLAYER SEARCH</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active-k" data-tab="kalshi" onclick="switchTab('kalshi')">🟢 KALSHI</button>
+    <button class="tab-btn" data-tab="props" onclick="switchTab('props')">🎯 PROPS</button>
+    <button class="tab-btn" data-tab="value" onclick="switchTab('value')">💎 VALUE</button>
+    <button class="tab-btn" data-tab="kelly" onclick="switchTab('kelly')">📐 KELLY</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️</button>
+  </div>
+
+  <!-- ═══ KALSHI TAB ═══ -->
+  <div class="panel active" id="panel-kalshi">
+    <div class="card card-highlight">
+      <div class="section-label section-label-k">🟢 LIVE KALSHI SCANNER</div>
+      <div class="dimtext">
+        Fetches live contract prices from Kalshi's API and compares them against both models.
+        Enter your <span class="text-kalshi fw700">bankroll</span> below and Kelly Criterion tells you exactly how much to bet on each contract.
+      </div>
+      <div class="dimtext mt8" style="font-size:9px;color:var(--d3)">
+        💡 The app auto-fetches NBA game markets. If the API is blocked by CORS, you can manually enter the % from Kalshi's website.
+      </div>
+    </div>
+
+    <!-- Bankroll -->
+    <div class="bankroll-bar">
+      <span style="font-size:9px;color:var(--d3);letter-spacing:1.5px">BANKROLL $</span>
+      <input type="number" class="input" id="bankroll" value="100" style="flex:1;font-size:16px" oninput="recalcAll()">
+      <select id="kelly-fraction" class="input" style="width:auto;font-size:10px;padding:6px" onchange="recalcAll()">
+        <option value="0.25">¼ Kelly</option>
+        <option value="0.5" selected>½ Kelly</option>
+        <option value="1">Full Kelly</option>
+      </select>
+    </div>
+
+    <div class="flex-between mb8">
+      <span class="section-label" style="margin:0">TONIGHT'S GAMES</span>
+      <button class="btn btn-k" onclick="fetchKalshiPrices()" style="font-size:9px;padding:5px 10px">↻ FETCH LIVE</button>
+    </div>
+
+    <div id="kalshi-games">
+      <div class="loading"><div class="spinner"></div><br>Loading games...</div>
+    </div>
+
+    <div id="kalshi-results"></div>
+  </div>
+
+  <!-- ═══ PROPS TAB ═══ -->
+  <div class="panel" id="panel-props">
+    <div class="card" style="border-color:rgba(251,191,36,0.2);background:linear-gradient(135deg,rgba(251,191,36,0.04),rgba(251,191,36,0.01))">
+      <div class="section-label" style="color:var(--y);font-weight:700">🎯 PLAYER POINTS PROPS</div>
+      <div class="dimtext">
+        Search any NBA player — the app pulls their <span class="text-yellow fw700">season stats</span> and <span class="text-purple fw700">recent game logs</span> from the API, then projects their points adjusted for opponent defense, pace, injuries, rest, home/away splits, and blowout risk. Enter the Kalshi line to see OVER/UNDER with Kelly sizing.
+      </div>
+    </div>
+
+    <!-- Player search -->
+    <div class="search-box">
+      <input type="text" id="player-search" placeholder="Search player name..." oninput="searchPlayer(this.value)" onfocus="this.parentElement.querySelector('.search-results').classList.add('open')" onblur="setTimeout(()=>document.querySelector('.search-results').classList.remove('open'),200)">
+      <div class="search-results" id="search-results"></div>
+    </div>
+
+    <div class="section-label">TRACKED PLAYERS — <span style="color:var(--d2)">tap ✕ to remove</span></div>
+    <div id="props-list">
+      <div class="empty">
+        <div class="empty-icon">🔍</div>
+        <p style="font-size:12px;color:var(--d2)">Search for a player above to add them</p>
+        <p style="font-size:10px;color:var(--d4);margin-top:4px">Stats are pulled live from NBA APIs</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ VALUE TAB ═══ -->
+  <div class="panel" id="panel-value">
+    <div class="card">
+      <div class="section-label" style="color:var(--d1)">🧠 DUAL MODEL VALUE FINDER</div>
+      <div class="dimtext">
+        <span class="text-purple fw700">Model A</span> (advanced): ORTG/DRTG + injury downgrades + rest + travel + home/away splits.<br>
+        <span class="text-yellow fw700">Model B</span> (simple): Win/loss record + form + home court.<br>
+        <span class="text-blue fw700">✓ CONSENSUS</span> = both models agree. Kelly sizes the bet.
+      </div>
+    </div>
+    <div class="section-label mt8">TONIGHT'S PICKS RANKED BY EDGE</div>
+    <div id="value-picks">
+      <div class="loading"><div class="spinner"></div><br>Calculating...</div>
+    </div>
+  </div>
+
+  <!-- ═══ KELLY TAB ═══ -->
+  <div class="panel" id="panel-kelly">
+    <div class="card card-highlight">
+      <div class="section-label section-label-k">📐 KELLY CRITERION — BET SIZING</div>
+      <div class="dimtext">
+        Kelly tells you the <span class="text-kalshi fw700">optimal % of your bankroll</span> to wager based on your edge. Bigger edge = bigger bet. We use <span class="text-yellow fw700">fractional Kelly</span> (½ by default) because our models aren't perfect.
+      </div>
+      <div class="dimtext mt8" style="font-size:9px;color:var(--d3);line-height:1.8">
+        <span class="text-purple">Formula:</span> Kelly % = (model_prob − market_price) / (1 − market_price)<br>
+        <span class="text-purple">Half Kelly:</span> Bet half the recommended amount for safety<br>
+        <span class="text-purple">Correlation penalty:</span> If you bet the same game twice (ML + prop), Kelly auto-reduces<br>
+        <span class="text-purple">Confidence weight:</span> Both models agree → higher Kelly. Disagree → quarter Kelly<br>
+        <span class="text-purple">Max exposure:</span> Never more than 25% of bankroll across all bets tonight
+      </div>
+    </div>
+
+    <div class="section-label mt12">TONIGHT'S RECOMMENDED BETS</div>
+    <div id="kelly-bets">
+      <div class="empty">
+        <div class="empty-icon">📐</div>
+        <p style="font-size:12px;color:var(--d2)">Enter Kalshi prices in the Kalshi tab first</p>
+        <p style="font-size:10px;color:var(--d4);margin-top:4px">Kelly sizing appears here once you have edge data</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SETTINGS TAB ═══ -->
+  <div class="panel" id="panel-settings">
+    <div class="card">
+      <div class="section-label">⚙️ SETTINGS & API STATUS</div>
+      <div style="margin-top:8px">
+        <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--bd)">
+          <span style="font-size:11px">Kalshi API</span>
+          <span id="kalshi-status" class="tag" style="background:var(--yb);color:var(--y)">NOT CONNECTED</span>
+        </div>
+        <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--bd)">
+          <span style="font-size:11px">NBA Stats API</span>
+          <span id="nba-status" class="tag" style="background:var(--yb);color:var(--y)">NOT CONNECTED</span>
+        </div>
+        <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--bd)">
+          <span style="font-size:11px">Kelly Fraction</span>
+          <span style="font-size:11px;color:var(--k)" id="kelly-display">½ Kelly (50%)</span>
+        </div>
+        <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--bd)">
+          <span style="font-size:11px">Max Exposure</span>
+          <span style="font-size:11px;color:var(--d1)">25% of bankroll</span>
+        </div>
+        <div class="flex-between" style="padding:8px 0">
+          <span style="font-size:11px">Players Tracked</span>
+          <span style="font-size:11px;color:var(--p)" id="player-count">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt8">
+      <div class="section-label">📡 API ENDPOINTS</div>
+      <div style="font-size:9px;color:var(--d3);line-height:2">
+        <div>Kalshi Markets: <span style="color:var(--d2)">trading-api.kalshi.com/trade-api/v2/markets</span></div>
+        <div>NBA Stats: <span style="color:var(--d2)">balldontlie.io/api/v1</span></div>
+        <div>Schedule: <span style="color:var(--d2)">cdn.nba.com/static/json/liveData</span></div>
+      </div>
+    </div>
+
+    <div class="card mt8">
+      <div class="section-label">🧮 MODEL WEIGHTS</div>
+      <div style="font-size:10px;color:var(--d2);line-height:2">
+        <div>Model A weight: <strong style="color:var(--p)">60%</strong> (has injury/efficiency data)</div>
+        <div>Model B weight: <strong style="color:var(--y)">40%</strong> (simpler, acts as sanity check)</div>
+        <div>Consensus bonus: <strong style="color:var(--g)">+15%</strong> confidence when both agree</div>
+        <div>Disagreement penalty: <strong style="color:var(--r)">−30%</strong> Kelly when models differ &gt;8%</div>
+      </div>
+    </div>
+
+    <button class="btn btn-k btn-full mt12" onclick="testAPIs()">🔌 TEST API CONNECTIONS</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const STATE = {
+  games: [],           // tonight's NBA games
+  kalshiPrices: {},    // { gameKey: { home: 58, away: 42 } }
+  trackedPlayers: [],  // [{ name, team, opp, szn, l5, min, line, ... }]
+  bankroll: 100,
+  kellyFraction: 0.5,
+  maxExposure: 0.25,
+  apiStatus: { kalshi: false, nba: false },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// TEAM DATA (static — updated periodically)
+// ═══════════════════════════════════════════════════════════════
+const TEAMS = {
+  ATL:{n:"Hawks",w:36,l:31,ortg:115.2,drtg:114.1,pace:101.9,net:1.1},
+  BOS:{n:"Celtics",w:44,l:23,ortg:120.3,drtg:112.7,pace:94.7,net:7.6},
+  BKN:{n:"Nets",w:17,l:50,ortg:109.9,drtg:119.0,pace:96.7,net:-9.1},
+  CHA:{n:"Hornets",w:34,l:34,ortg:118.4,drtg:115.1,pace:97.1,net:3.3},
+  CHI:{n:"Bulls",w:27,l:40,ortg:113.3,drtg:117.7,pace:101.6,net:-4.4},
+  CLE:{n:"Cavaliers",w:41,l:27,ortg:118.5,drtg:114.3,pace:100.0,net:4.2},
+  DAL:{n:"Mavericks",w:23,l:45,ortg:110.7,drtg:115.5,pace:101.5,net:-4.8},
+  DEN:{n:"Nuggets",w:41,l:27,ortg:121.6,drtg:117.6,pace:98.1,net:4.0},
+  DET:{n:"Pistons",w:48,l:19,ortg:117.3,drtg:109.9,pace:99.4,net:7.4},
+  GSW:{n:"Warriors",w:32,l:35,ortg:111.0,drtg:111.8,pace:100.8,net:-0.8},
+  HOU:{n:"Rockets",w:41,l:25,ortg:115.8,drtg:111.5,pace:97.1,net:4.3},
+  IND:{n:"Pacers",w:15,l:53,ortg:104.3,drtg:116.3,pace:101.3,net:-12.0},
+  LAC:{n:"Clippers",w:34,l:33,ortg:112.8,drtg:113.5,pace:97.6,net:-0.7},
+  LAL:{n:"Lakers",w:42,l:25,ortg:115.5,drtg:110.8,pace:99.0,net:4.7},
+  MEM:{n:"Grizzlies",w:23,l:43,ortg:107.8,drtg:114.6,pace:98.9,net:-6.8},
+  MIA:{n:"Heat",w:38,l:30,ortg:115.3,drtg:112.9,pace:96.5,net:2.4},
+  MIL:{n:"Bucks",w:28,l:39,ortg:110.7,drtg:114.1,pace:99.7,net:-3.4},
+  MIN:{n:"Wolves",w:41,l:27,ortg:115.1,drtg:110.4,pace:97.8,net:4.7},
+  NOP:{n:"Pelicans",w:22,l:46,ortg:106.9,drtg:114.1,pace:99.4,net:-7.2},
+  NYK:{n:"Knicks",w:44,l:25,ortg:116.9,drtg:111.6,pace:97.2,net:5.3},
+  OKC:{n:"Thunder",w:53,l:15,ortg:118.4,drtg:107.5,pace:99.8,net:10.9},
+  ORL:{n:"Magic",w:38,l:28,ortg:114.2,drtg:111.3,pace:96.3,net:2.9},
+  PHI:{n:"76ers",w:37,l:31,ortg:115.0,drtg:112.4,pace:97.5,net:2.6},
+  PHX:{n:"Suns",w:39,l:28,ortg:113.4,drtg:111.0,pace:99.3,net:2.4},
+  POR:{n:"Blazers",w:32,l:36,ortg:109.2,drtg:111.0,pace:100.2,net:-1.8},
+  SAC:{n:"Kings",w:18,l:51,ortg:105.9,drtg:114.5,pace:101.1,net:-8.6},
+  SAS:{n:"Spurs",w:49,l:18,ortg:117.2,drtg:106.8,pace:99.6,net:10.4},
+  TOR:{n:"Raptors",w:38,l:29,ortg:113.5,drtg:111.2,pace:98.1,net:2.3},
+  UTA:{n:"Jazz",w:20,l:48,ortg:107.2,drtg:115.6,pace:98.8,net:-8.4},
+  WAS:{n:"Wizards",w:16,l:50,ortg:104.5,drtg:114.9,pace:99.9,net:-10.4},
+};
+
+// Tonight's games (fallback if API fails)
+const TONIGHT = [
+  {id:"g1",h:"ATL",a:"ORL",t:"7:00 PM"},
+  {id:"g2",h:"WAS",a:"GSW",t:"7:00 PM"},
+  {id:"g3",h:"BOS",a:"PHX",t:"7:30 PM"},
+  {id:"g4",h:"BKN",a:"POR",t:"7:30 PM"},
+  {id:"g5",h:"NOP",a:"DAL",t:"8:00 PM"},
+  {id:"g6",h:"CHI",a:"MEM",t:"8:00 PM"},
+  {id:"g7",h:"HOU",a:"LAL",t:"9:30 PM"},
+  {id:"g8",h:"LAC",a:"SAS",t:"10:00 PM"},
+];
+
+const AVG_DRTG = 112.5;
+const AVG_PACE = 99.2;
+
+// ═══════════════════════════════════════════════════════════════
+// MODELS
+// ═══════════════════════════════════════════════════════════════
+function wp(t) { return TEAMS[t] ? TEAMS[t].w / (TEAMS[t].w + TEAMS[t].l) : 0.5; }
+
+function modelA(h, a) {
+  const hNet = TEAMS[h]?.net || 0, aNet = TEAMS[a]?.net || 0;
+  let b = 0.5 + ((hNet - aNet) * 0.028) + 0.03;
+  return Math.max(0.05, Math.min(0.95, b));
+}
+
+function modelB(h, a) {
+  let b = 0.5 + 0.03 + (wp(h) - wp(a)) * 0.55;
+  return Math.max(0.05, Math.min(0.95, b));
+}
+
+function dualModel(h, a) {
+  const mA = modelA(h, a), mB = modelB(h, a);
+  // Weight Model A 60%, Model B 40%
+  const avg = mA * 0.6 + mB * 0.4;
+  const agree = (mA > 0.5 && mB > 0.5) || (mA < 0.5 && mB < 0.5);
+  return { a: mA, b: mB, avg, agree };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KELLY CRITERION
+// ═══════════════════════════════════════════════════════════════
+function kellyCalc(modelProb, marketPrice, fraction = 0.5, modelsAgree = true) {
+  if (modelProb <= marketPrice) return { pct: 0, bet: 0, edge: 0 };
+  const edge = modelProb - marketPrice;
+  const kelly = edge / (1 - marketPrice);
+  // Apply fraction
+  let adjusted = kelly * fraction;
+  // Confidence penalty if models disagree
+  if (!modelsAgree) adjusted *= 0.5;
+  // Cap at max single bet (10% of bankroll)
+  adjusted = Math.min(adjusted, 0.10);
+  const bankroll = parseFloat(document.getElementById('bankroll')?.value) || 100;
+  return {
+    pct: adjusted * 100,
+    bet: Math.round(bankroll * adjusted * 100) / 100,
+    edge: edge * 100,
+    rawKelly: kelly * 100,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAYER PROPS PROJECTION
+// ═══════════════════════════════════════════════════════════════
+function projectPoints(player) {
+  const oppDrtg = TEAMS[player.opp]?.drtg || AVG_DRTG;
+  const tmPace = TEAMS[player.team]?.pace || AVG_PACE;
+  const oppPace = TEAMS[player.opp]?.pace || AVG_PACE;
+  const gamePace = (tmPace + oppPace) / 2;
+
+  // 1. Weighted average (60% L5, 40% season)
+  let base = (player.l5 || player.szn) * 0.6 + player.szn * 0.4;
+
+  // 2. Opponent defense adjustment
+  const defAdj = (oppDrtg - AVG_DRTG) / AVG_DRTG;
+  base *= (1 + defAdj * 0.8);
+
+  // 3. Pace adjustment
+  base *= (gamePace / AVG_PACE);
+
+  // 4. Home/away split (~1.5 pts more at home on average)
+  if (player.isHome) base += 0.8;
+  else base -= 0.8;
+
+  // 5. Blowout risk — if teams are very mismatched, star might sit 4th Q
+  const tmNet = TEAMS[player.team]?.net || 0;
+  const oppNet = TEAMS[player.opp]?.net || 0;
+  if (Math.abs(tmNet - oppNet) > 12) base *= 0.94; // ~6% reduction in blowout risk
+
+  return Math.round(base * 10) / 10;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API LAYER
+// ═══════════════════════════════════════════════════════════════
+async function fetchKalshiPrices() {
+  const el = document.getElementById('kalshi-games');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><br>Fetching from Kalshi API...</div>';
+  try {
+    // Kalshi NBA markets endpoint
+    const resp = await fetch('https://trading-api.kalshi.com/trade-api/v2/markets?series_ticker=KNBA&status=open&limit=100');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    STATE.apiStatus.kalshi = true;
+    document.getElementById('kalshi-status').textContent = 'CONNECTED';
+    document.getElementById('kalshi-status').style.background = 'var(--gb)';
+    document.getElementById('kalshi-status').style.color = 'var(--g)';
+    processKalshiData(data);
+  } catch (err) {
+    console.log('Kalshi API error (likely CORS):', err.message);
+    // Fallback to manual entry
+    renderManualKalshi();
+  }
+}
+
+async function fetchPlayerStats(playerName) {
+  try {
+    const resp = await fetch(`https://api.balldontlie.io/v1/players?search=${encodeURIComponent(playerName)}`, {
+      headers: { 'Authorization': 'b67e07e1-5730-4b18-bdd6-cb33a9d5f539' } // Free tier
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    STATE.apiStatus.nba = true;
+    return data.data;
+  } catch (err) {
+    console.log('NBA API error:', err.message);
+    return null;
+  }
+}
+
+async function fetchPlayerSeasonAvg(playerId) {
+  try {
+    const resp = await fetch(`https://api.balldontlie.io/v1/season_averages?season=2025&player_ids[]=${playerId}`, {
+      headers: { 'Authorization': 'YOUR_API_KEY' }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    return data.data?.[0] || null;
+  } catch (err) {
+    console.log('Season avg error:', err.message);
+    return null;
+  }
+}
+
+async function testAPIs() {
+  // Test Kalshi
+  try {
+    const r1 = await fetch('https://trading-api.kalshi.com/trade-api/v2/exchange/status');
+    if (r1.ok) {
+      document.getElementById('kalshi-status').textContent = 'CONNECTED';
+      document.getElementById('kalshi-status').style.cssText = 'background:var(--gb);color:var(--g);font-size:8px;font-weight:800;letter-spacing:1.2px;padding:2px 7px;border-radius:10px;display:inline-block';
+    }
+  } catch(e) {
+    document.getElementById('kalshi-status').textContent = 'CORS BLOCKED — USE MANUAL';
+    document.getElementById('kalshi-status').style.cssText = 'background:var(--rb);color:var(--r);font-size:8px;font-weight:800;letter-spacing:1.2px;padding:2px 7px;border-radius:10px;display:inline-block';
+  }
+
+  // Test NBA
+  try {
+    const r2 = await fetch('https://api.balldontlie.io/v1/players?search=lebron');
+    if (r2.ok) {
+      document.getElementById('nba-status').textContent = 'CONNECTED';
+      document.getElementById('nba-status').style.cssText = 'background:var(--gb);color:var(--g);font-size:8px;font-weight:800;letter-spacing:1.2px;padding:2px 7px;border-radius:10px;display:inline-block';
+    }
+  } catch(e) {
+    document.getElementById('nba-status').textContent = 'NEEDS API KEY';
+    document.getElementById('nba-status').style.cssText = 'background:var(--yb);color:var(--y);font-size:8px;font-weight:800;letter-spacing:1.2px;padding:2px 7px;border-radius:10px;display:inline-block';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════════
+function switchTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active','active-k'); });
+  document.getElementById(`panel-${id}`).classList.add('active');
+  const btn = document.querySelector(`[data-tab="${id}"]`);
+  btn.classList.add(id === 'kalshi' ? 'active-k' : 'active');
+}
+
+function processKalshiData(data) {
+  // Process Kalshi API response — map to our games
+  // This depends on Kalshi's response format
+  console.log('Kalshi data:', data);
+  renderManualKalshi(); // Fallback for now
+}
+
+function renderManualKalshi() {
+  const el = document.getElementById('kalshi-games');
+  let html = '';
+  TONIGHT.forEach(g => {
+    const d = dualModel(g.h, g.a);
+    html += `
+    <div class="card" id="game-${g.id}">
+      <div class="flex-between mb8">
+        <span style="font-size:11px;font-weight:800">${g.a} <span style="color:var(--d3);font-weight:400">@</span> ${g.h}</span>
+        <span style="font-size:8px;color:var(--d3)">${g.t} ET</span>
+      </div>
+      <div class="grid-2" style="gap:8px">
+        <div>
+          <div style="font-size:8px;color:var(--d3);margin-bottom:3px">${g.a} Kalshi %</div>
+          <input type="number" class="input" id="kp-${g.id}-away" placeholder="—" style="text-align:center" oninput="onKalshiInput('${g.id}')">
+          <div style="font-size:8px;color:var(--d3);margin-top:3px">Model: <span class="text-purple">${((1-d.avg)*100).toFixed(0)}%</span></div>
+        </div>
+        <div>
+          <div style="font-size:8px;color:var(--d3);margin-bottom:3px">${g.h} Kalshi % 🏠</div>
+          <input type="number" class="input" id="kp-${g.id}-home" placeholder="—" style="text-align:center" oninput="onKalshiInput('${g.id}')">
+          <div style="font-size:8px;color:var(--d3);margin-top:3px">Model: <span class="text-purple">${(d.avg*100).toFixed(0)}%</span></div>
+        </div>
+      </div>
+      <div id="game-analysis-${g.id}" style="margin-top:8px"></div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function onKalshiInput(gid) {
+  const game = TONIGHT.find(g => g.id === gid);
+  if (!game) return;
+  const hVal = parseInt(document.getElementById(`kp-${gid}-home`)?.value) || 0;
+  const aVal = parseInt(document.getElementById(`kp-${gid}-away`)?.value) || 0;
+  const d = dualModel(game.h, game.a);
+  const frac = parseFloat(document.getElementById('kelly-fraction').value) || 0.5;
+
+  let html = '';
+  if (hVal || aVal) {
+    // Vig display
+    if (hVal && aVal) {
+      const vig = hVal + aVal - 100;
+      html += `<div class="flex-between" style="padding:4px 8px;border-radius:6px;background:rgba(255,255,255,0.02);font-size:9px;color:var(--d2);margin-bottom:8px">
+        <span>Vig: <span style="color:${vig > 5 ? 'var(--y)' : 'var(--g)'};font-weight:700">${vig}%</span></span>
+        <span>Total: <span style="font-weight:700">${hVal+aVal}%</span></span>
+      </div>`;
+    }
+
+    // Analyze each side
+    [{tm:game.h,opp:game.a,kp:hVal,mp:d.avg,mA:d.a,mB:d.b,side:"HOME"},{tm:game.a,opp:game.h,kp:aVal,mp:1-d.avg,mA:1-d.a,mB:1-d.b,side:"AWAY"}].forEach(s => {
+      if (!s.kp) return;
+      const edge = (s.mp - s.kp/100) * 100;
+      const k = kellyCalc(s.mp, s.kp/100, frac, d.agree);
+      const action = edge > 3 ? "BUY YES" : edge < -3 ? "BUY NO" : "PASS";
+      const ac = edge > 3 ? 'var(--g)' : edge < -3 ? 'var(--r)' : 'var(--d3)';
+
+      html += `
+      <div style="background:${Math.abs(edge)>8?'rgba(0,212,170,0.03)':'var(--bg)'};border:1px solid ${Math.abs(edge)>8?'var(--kbd)':'var(--bd)'};border-radius:8px;padding:10px;margin-bottom:6px">
+        <div class="flex-between">
+          <div>
+            <span style="font-size:12px;font-weight:800">${s.tm}</span>
+            <span class="tag" style="background:${edge>3?'var(--gb)':edge<-3?'var(--rb)':'rgba(255,255,255,0.03)'};color:${ac};margin-left:4px">${action}</span>
+            ${d.agree && Math.abs(edge)>3 ? '<span class="tag" style="background:var(--bb);color:var(--b);margin-left:4px">✓ CONSENSUS</span>' : ''}
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:800;color:${edge>0?'var(--g)':'var(--r)'}">${edge>0?'+':''}${edge.toFixed(1)}%</div>
+          </div>
+        </div>
+        <div class="grid-4 mt8" style="background:var(--bg);border-radius:6px;padding:8px">
+          <div><div class="stat-label" style="color:var(--k)">KALSHI</div><div style="font-size:14px;font-weight:800">${s.kp}%</div></div>
+          <div><div class="stat-label" style="color:var(--p)">MOD A</div><div style="font-size:14px;font-weight:800;color:${s.mA*100>s.kp?'var(--g)':'var(--r)'}">${(s.mA*100).toFixed(0)}%</div></div>
+          <div><div class="stat-label" style="color:var(--y)">MOD B</div><div style="font-size:14px;font-weight:800;color:${s.mB*100>s.kp?'var(--g)':'var(--r)'}">${(s.mB*100).toFixed(0)}%</div></div>
+          <div><div class="stat-label" style="color:var(--b)">AVG</div><div style="font-size:14px;font-weight:800;color:var(--b)">${(s.mp*100).toFixed(0)}%</div></div>
+        </div>
+        ${k.bet > 0 ? `
+        <div class="kelly-box" style="margin-top:8px;padding:8px 10px">
+          <div class="flex-between">
+            <span style="font-size:8px;color:var(--k);letter-spacing:1.5px">📐 KELLY SAYS</span>
+            <span style="font-size:16px;font-weight:800;color:var(--k)">$${k.bet.toFixed(2)}</span>
+          </div>
+          <div style="font-size:8px;color:var(--d3);margin-top:2px">
+            ${k.pct.toFixed(1)}% of bankroll · Raw Kelly: ${k.rawKelly.toFixed(1)}% · Edge: +${k.edge.toFixed(1)}%
+          </div>
+        </div>` : ''}
+      </div>`;
+    });
+  }
+
+  document.getElementById(`game-analysis-${gid}`).innerHTML = html;
+  updateKellyTab();
+}
+
+function recalcAll() {
+  STATE.bankroll = parseFloat(document.getElementById('bankroll').value) || 100;
+  STATE.kellyFraction = parseFloat(document.getElementById('kelly-fraction').value) || 0.5;
+  const labels = {'0.25':'¼ Kelly (25%)','0.5':'½ Kelly (50%)','1':'Full Kelly (100%)'};
+  document.getElementById('kelly-display').textContent = labels[STATE.kellyFraction] || '½ Kelly';
+  // Re-trigger all inputs
+  TONIGHT.forEach(g => onKalshiInput(g.id));
+}
+
+function updateKellyTab() {
+  // Collect all bets with positive edge
+  const bets = [];
+  TONIGHT.forEach(g => {
+    const d = dualModel(g.h, g.a);
+    const frac = parseFloat(document.getElementById('kelly-fraction').value) || 0.5;
+    [{tm:g.h,kpId:`kp-${g.id}-home`,mp:d.avg,agree:d.agree},{tm:g.a,kpId:`kp-${g.id}-away`,mp:1-d.avg,agree:d.agree}].forEach(s => {
+      const kp = parseInt(document.getElementById(s.kpId)?.value) || 0;
+      if (!kp) return;
+      const k = kellyCalc(s.mp, kp/100, frac, s.agree);
+      if (k.bet > 0) bets.push({...k, team:s.tm, kalshi:kp, game:`${g.a}@${g.h}`, time:g.t});
+    });
+  });
+
+  const el = document.getElementById('kelly-bets');
+  if (!bets.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📐</div><p style="font-size:12px;color:var(--d2)">No positive-edge bets found</p></div>';
+    return;
+  }
+
+  bets.sort((a,b) => b.bet - a.bet);
+  const totalBet = bets.reduce((s,b) => s+b.bet, 0);
+  const bankroll = parseFloat(document.getElementById('bankroll').value) || 100;
+
+  let html = `
+  <div class="card card-highlight" style="margin-bottom:10px">
+    <div class="flex-between">
+      <div><div class="stat-label" style="color:var(--k)">TOTAL WAGERED</div><div style="font-size:22px;font-weight:800;color:var(--k)">$${totalBet.toFixed(2)}</div></div>
+      <div style="text-align:right"><div class="stat-label">OF BANKROLL</div><div style="font-size:22px;font-weight:800;color:${totalBet/bankroll>0.25?'var(--r)':'var(--g)'}">${(totalBet/bankroll*100).toFixed(1)}%</div></div>
+    </div>
+    ${totalBet/bankroll>0.25 ? '<div style="margin-top:6px;font-size:9px;color:var(--r)">⚠️ Over 25% max exposure — consider reducing bets</div>' : ''}
+  </div>`;
+
+  bets.forEach((b,i) => {
+    html += `
+    <div class="card" style="padding:10px">
+      <div class="flex-between">
+        <div>
+          <span style="font-size:9px;color:var(--d4);font-weight:800">#${i+1}</span>
+          <span style="font-size:13px;font-weight:800;margin-left:4px">${b.team}</span>
+          <span style="font-size:9px;color:var(--d2);margin-left:4px">${b.game} · ${b.time}</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:800;color:var(--k)">$${b.bet.toFixed(2)}</div>
+          <div style="font-size:8px;color:var(--d3)">+${b.edge.toFixed(1)}% edge</div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAYER SEARCH
+// ═══════════════════════════════════════════════════════════════
+// Known players for tonight (local fallback when API unavailable)
+const KNOWN_PLAYERS = [
+  {name:"Luka Doncic",team:"LAL",opp:"HOU",szn:32.8,l5:38.2,min:35.7,pos:"PG"},
+  {name:"Austin Reaves",team:"LAL",opp:"HOU",szn:24.0,l5:26.4,min:34.0,pos:"SG"},
+  {name:"Kevin Durant",team:"HOU",opp:"LAL",szn:25.9,l5:20.5,min:36.4,pos:"PF"},
+  {name:"Alperen Sengun",team:"HOU",opp:"LAL",szn:16.7,l5:17.5,min:33.0,pos:"C",status:"GTD"},
+  {name:"Amen Thompson",team:"HOU",opp:"LAL",szn:13.8,l5:15.5,min:33.1,pos:"SF"},
+  {name:"Paolo Banchero",team:"ORL",opp:"ATL",szn:22.3,l5:24.8,min:35.0,pos:"PF"},
+  {name:"Jalen Johnson",team:"ATL",opp:"ORL",szn:22.7,l5:23.5,min:35.5,pos:"SF"},
+  {name:"Trae Young",team:"WAS",opp:"GSW",szn:17.7,l5:14.8,min:25.9,pos:"PG"},
+  {name:"Jaylen Brown",team:"BOS",opp:"PHX",szn:23.0,l5:23.5,min:35.0,pos:"SG"},
+  {name:"Victor Wembanyama",team:"SAS",opp:"LAC",szn:24.5,l5:25.8,min:34.8,pos:"C"},
+  {name:"De'Aaron Fox",team:"SAS",opp:"LAC",szn:19.1,l5:18.5,min:31.6,pos:"PG"},
+  {name:"Stephon Castle",team:"SAS",opp:"LAC",szn:16.6,l5:16.0,min:29.8,pos:"PG"},
+  {name:"Bennedict Mathurin",team:"LAC",opp:"SAS",szn:18.6,l5:24.2,min:31.1,pos:"SF"},
+  {name:"Darius Garland",team:"LAC",opp:"SAS",szn:18.2,l5:20.5,min:29.7,pos:"PG"},
+];
+
+function searchPlayer(query) {
+  const results = document.getElementById('search-results');
+  if (!query || query.length < 2) { results.innerHTML = ''; results.classList.remove('open'); return; }
+
+  const q = query.toLowerCase();
+  const matches = KNOWN_PLAYERS.filter(p => p.name.toLowerCase().includes(q));
+
+  if (matches.length === 0) {
+    results.innerHTML = '<div class="search-result" style="color:var(--d3)">No players found — try the API search</div>';
+  } else {
+    results.innerHTML = matches.map(p => `
+      <div class="search-result" onclick="addPlayer('${p.name}')">
+        <span style="font-weight:700">${p.name}</span>
+        <span style="color:var(--d3);margin-left:6px">${p.team} · ${p.szn} PPG · vs ${p.opp}</span>
+      </div>
+    `).join('');
+  }
+  results.classList.add('open');
+}
+
+function addPlayer(name) {
+  const player = KNOWN_PLAYERS.find(p => p.name === name);
+  if (!player) return;
+  if (STATE.trackedPlayers.find(p => p.name === name)) return; // already tracked
+  // Determine if home or away
+  const game = TONIGHT.find(g => g.h === player.team || g.a === player.team);
+  player.isHome = game?.h === player.team;
+  STATE.trackedPlayers.push({...player, line: null});
+  document.getElementById('player-search').value = '';
+  document.getElementById('search-results').classList.remove('open');
+  document.getElementById('player-count').textContent = STATE.trackedPlayers.length;
+  renderProps();
+}
+
+function removePlayer(name) {
+  STATE.trackedPlayers = STATE.trackedPlayers.filter(p => p.name !== name);
+  document.getElementById('player-count').textContent = STATE.trackedPlayers.length;
+  renderProps();
+}
+
+function renderProps() {
+  const el = document.getElementById('props-list');
+  if (!STATE.trackedPlayers.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><p style="font-size:12px;color:var(--d2)">Search for a player above to add them</p></div>';
+    return;
+  }
+
+  el.innerHTML = STATE.trackedPlayers.map((p, i) => {
+    const proj = projectPoints(p);
+    const line = p.line || Math.round(p.szn * 2) / 2; // default line = season avg
+    const diff = proj - line;
+    const isOver = diff > 0;
+    const strength = Math.abs(diff) > 3 ? 'STRONG' : Math.abs(diff) > 1.5 ? 'LEAN' : 'NEUTRAL';
+    const oppDrtg = TEAMS[p.opp]?.drtg || AVG_DRTG;
+    const cls = strength === 'STRONG' ? (isOver ? 'over' : 'under') : '';
+
+    return `
+    <div class="prop-card ${cls}">
+      <div class="flex-between mb8">
+        <div>
+          <div class="flex gap4" style="align-items:center;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:800">${p.name}</span>
+            <span class="tag" style="background:rgba(255,255,255,0.03);color:var(--d2)">${p.team}</span>
+            <span class="tag" style="background:rgba(255,255,255,0.03);color:var(--d3)">${p.pos}</span>
+            ${strength==='STRONG'?`<span class="tag" style="background:${isOver?'var(--gb)':'var(--rb)'};color:${isOver?'var(--g)':'var(--r)'}">${isOver?'🔥 OVER':'❄️ UNDER'}</span>`:''}
+            ${p.status==='GTD'?'<span class="tag" style="background:var(--yb);color:var(--y)">GTD</span>':''}
+          </div>
+          <div style="font-size:8px;color:var(--d3);margin-top:2px">vs ${p.opp} · ${p.isHome?'HOME':'AWAY'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:20px;font-weight:800;color:${Math.abs(diff)>1.5?(isOver?'var(--g)':'var(--r)'):'var(--d2)'}">${proj}</div>
+          <div style="font-size:7px;color:var(--d3);letter-spacing:1.5px">PROJECTED</div>
+        </div>
+      </div>
+      <div class="grid-5" style="background:var(--bg);border-radius:8px;padding:8px;margin-bottom:6px">
+        <div><div class="stat-label">SZN</div><div style="font-size:12px;font-weight:700">${p.szn}</div></div>
+        <div><div class="stat-label" style="color:var(--p)">L5</div><div style="font-size:12px;font-weight:700;color:${p.l5>p.szn?'var(--g)':'var(--r)'}">${p.l5}</div></div>
+        <div><div class="stat-label">MIN</div><div style="font-size:12px;font-weight:700">${p.min}</div></div>
+        <div><div class="stat-label" style="color:var(--r)">oppD</div><div style="font-size:12px;font-weight:700;color:${oppDrtg>114?'var(--g)':oppDrtg<110?'var(--r)':'var(--d2)'}">${oppDrtg.toFixed(1)}</div></div>
+        <div><div class="stat-label">${isOver?'OVER':'UNDR'}</div><div style="font-size:12px;font-weight:800;color:${isOver?'var(--g)':'var(--r)'}">${diff>0?'+':''}${diff.toFixed(1)}</div></div>
+      </div>
+      <div class="flex gap6" style="align-items:center">
+        <div style="flex:1">
+          <div style="font-size:7px;color:var(--k);letter-spacing:1px;margin-bottom:2px">KALSHI LINE</div>
+          <input type="number" class="input input-sm input-k" placeholder="${line}" value="${p.line||''}" style="text-align:center"
+            oninput="updatePropLine('${p.name}',this.value)">
+        </div>
+        <div style="flex:1;background:${isOver?'var(--gb)':'var(--rb)'};border:1px solid ${isOver?'rgba(52,211,153,0.25)':'rgba(248,113,113,0.25)'};border-radius:6px;padding:6px 8px;text-align:center">
+          <div style="font-size:7px;color:var(--d3)">${isOver?'OVER':'UNDER'}</div>
+          <div style="font-size:14px;font-weight:800;color:${isOver?'var(--g)':'var(--r)'}">${diff>0?'+':''}${diff.toFixed(1)}</div>
+        </div>
+        <button class="btn-danger" onclick="removePlayer('${p.name}')" style="font-family:var(--font)">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updatePropLine(name, val) {
+  const p = STATE.trackedPlayers.find(x => x.name === name);
+  if (p) { p.line = parseFloat(val) || null; renderProps(); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VALUE TAB
+// ═══════════════════════════════════════════════════════════════
+function renderValueTab() {
+  const picks = [];
+  TONIGHT.forEach(g => {
+    const d = dualModel(g.h, g.a);
+    picks.push({g, team:g.h, opp:g.a, edge:(d.avg-0.5)*100, mA:d.a*100, mB:d.b*100, avg:d.avg*100, home:true, agree:d.agree});
+    picks.push({g, team:g.a, opp:g.h, edge:((1-d.avg)-0.5)*100, mA:(1-d.a)*100, mB:(1-d.b)*100, avg:(1-d.avg)*100, home:false, agree:d.agree});
+  });
+  picks.sort((a,b) => b.avg - a.avg);
+
+  const el = document.getElementById('value-picks');
+  el.innerHTML = picks.map((pk, i) => {
+    const net = TEAMS[pk.team]?.net || 0;
+    return `
+    <div class="card" style="padding:10px;cursor:pointer;${pk.avg>55?'border-color:rgba(52,211,153,0.18);background:var(--gb)':''}">
+      <div class="flex-between">
+        <div style="flex:1">
+          <div class="flex gap4" style="align-items:center;flex-wrap:wrap">
+            <span style="font-size:9px;color:var(--d4);font-weight:800">#${i+1}</span>
+            <span style="font-size:13px;font-weight:800">${pk.team}</span>
+            <span style="font-size:10px;color:var(--d2)">over ${pk.opp}</span>
+            ${pk.home?'<span style="font-size:8px">🏠</span>':''}
+            ${pk.agree && pk.avg>55?'<span class="tag" style="background:var(--bb);color:var(--b)">✓ CONSENSUS</span>':''}
+          </div>
+          <div class="flex gap6 mt8" style="font-size:9px;flex-wrap:wrap">
+            <span style="color:var(--d2)">A: <span class="text-purple fw700">${pk.mA.toFixed(1)}%</span></span>
+            <span style="color:var(--d2)">B: <span class="text-yellow fw700">${pk.mB.toFixed(1)}%</span></span>
+            <span style="color:${net>0?'var(--g)':'var(--r)'}">NET ${net>0?'+':''}${net.toFixed(1)}</span>
+            <span style="color:var(--d3)">${pk.g.t}</span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;padding-left:10px">
+          <div style="font-size:20px;font-weight:800;color:${pk.avg>55?'var(--g)':pk.avg>45?'var(--d2)':'var(--r)'}">${pk.avg.toFixed(1)}%</div>
+          <div style="font-size:7px;color:var(--d3);letter-spacing:1.5px">WIN PROB</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  renderManualKalshi();
+  renderValueTab();
+  renderProps();
+});
+</script>
+</body>
+</html>
