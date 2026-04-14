@@ -28,18 +28,48 @@ CORS(app)
 
 
 # ─── AUTHENTICATION ───────────────────────────────────
+# On Railway: set KALSHI_KEY_ID and KALSHI_PRIVATE_KEY env vars.
+# Locally: falls back to reading the key files as before.
+import sys
+
+def _load_pem(env_var_name, fallback_file):
+    raw = os.environ.get(env_var_name, '').strip()
+    print(f"[bridge] {env_var_name}: {'SET (len={})'.format(len(raw)) if raw else 'NOT SET or empty'}", file=sys.stderr)
+    if raw:
+        pem = raw.replace('\\n', '\n')
+        if '\n' not in pem and ' ' in pem:
+            print(f"[bridge] {env_var_name}: detected spaces instead of newlines — auto-fixing", file=sys.stderr)
+            pem = pem.replace('-----BEGIN PRIVATE KEY----- ', '-----BEGIN PRIVATE KEY-----\n')
+            pem = pem.replace(' -----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+            parts = pem.split('\n')
+            fixed_lines = []
+            for part in parts:
+                if part.startswith('-----') or not part:
+                    fixed_lines.append(part)
+                else:
+                    b64 = part.replace(' ', '')
+                    fixed_lines.extend([b64[i:i+64] for i in range(0, len(b64), 64)])
+            pem = '\n'.join(fixed_lines) + '\n'
+        return pem
+    if os.path.exists(fallback_file):
+        print(f"[bridge] {env_var_name}: falling back to file {fallback_file}", file=sys.stderr)
+        with open(fallback_file, "r") as f:
+            return f.read()
+    print(f"[bridge] FATAL: {env_var_name} not set and file '{fallback_file}' not found.", file=sys.stderr)
+    print(f"[bridge] Available KALSHI_* vars: {[k for k in os.environ if 'KALSHI' in k]}", file=sys.stderr)
+    sys.exit(1)
+
 config = Configuration(host="https://api.elections.kalshi.com/trade-api/v2")
-config.api_key_id = "5a3ad6f1-a741-42a3-8ce6-20ce32529d7a"
-with open("thirdAPIKEY_converted.txt", "r") as f:
-    config.private_key_pem = f.read()
+config.api_key_id = os.environ.get('KALSHI_KEY_ID', '5a3ad6f1-a741-42a3-8ce6-20ce32529d7a')
+config.private_key_pem = _load_pem('KALSHI_PRIVATE_KEY', 'thirdAPIKEY_converted.txt')
 client = KalshiClient(config)
 
 # ─── READ/WRITE CLIENT (for placing/cancelling orders only) ───────────────
+# On Railway: set KALSHI_RW_KEY_ID and KALSHI_RW_PRIVATE_KEY env vars.
 RW_KEY_DIR = "/Applications/Betting Project/API Keys/orbitingrectangle12 (read : write)"
 rw_config = Configuration(host="https://api.elections.kalshi.com/trade-api/v2")
-rw_config.api_key_id = "e98fa333-9d9c-4402-a345-545ec5736023"
-with open(os.path.join(RW_KEY_DIR, "orbitingrectangle12_converted.txt"), "r") as f:
-    rw_config.private_key_pem = f.read()
+rw_config.api_key_id = os.environ.get('KALSHI_RW_KEY_ID', 'e98fa333-9d9c-4402-a345-545ec5736023')
+rw_config.private_key_pem = _load_pem('KALSHI_RW_PRIVATE_KEY', os.path.join(RW_KEY_DIR, 'orbitingrectangle12_converted.txt'))
 rw_client = KalshiClient(rw_config)
 
 ODDS_API_KEY = '4e95ed44b922d40231f0bf295268a7de'
