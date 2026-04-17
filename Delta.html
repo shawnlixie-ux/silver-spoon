@@ -655,6 +655,52 @@ body{
 
 .win-prob-large{font-size:36px;font-weight:800;line-height:1;font-family:var(--f);letter-spacing:-1px}
 .win-prob-medium{font-size:22px;font-weight:800;font-family:var(--f)}
+
+/* ═══ MOBILE — phone in portrait, one-handed ═══ */
+@media (max-width:520px){
+  .hdr{padding:10px 12px;gap:8px;flex-wrap:wrap}
+  .hdr .logo{font-size:18px}
+  .hdr .sub{display:none}
+  .bankroll-inline label{font-size:9px;letter-spacing:0.5px}
+  .bankroll-inline input{width:60px;font-size:13px}
+
+  /* Tab pill — let it scroll horizontally instead of overflowing the viewport */
+  .tabs{
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    max-width:calc(100vw - 16px);
+    flex-wrap:nowrap;
+    justify-content:flex-start;
+    scroll-snap-type:x mandatory;
+    /* Soft fade on right edge hints there's more to scroll */
+    -webkit-mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
+            mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
+  }
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:8px 12px;font-size:10px;flex-shrink:0;scroll-snap-align:start}
+  .tab svg, .tab img{width:12px;height:12px}
+
+  /* Cards — tighter padding so content fits */
+  .cd{padding:12px}
+  .g2{grid-template-columns:1fr}
+  .g3{grid-template-columns:1fr 1fr}
+  .bt-grid{grid-template-columns:1fr 1fr}
+
+  /* Orderbook two-up → stack on mobile */
+  #ob-display{grid-template-columns:1fr}
+
+  /* Inputs at least 16px to stop iOS zoom-on-focus */
+  .inp, .inp-sm, select.inp{font-size:16px}
+
+  /* Tap targets — bump everything to ≥ 36px high */
+  .btn{padding:10px 14px;min-height:36px}
+  .btn[style*="font-size:9px"], .btn[style*="font-size:10px"]{min-height:32px}
+
+  .trade-confirm{padding:14px;font-size:14px}
+  .win-prob-large{font-size:28px}
+}
 </style>
 </head>
 <body>
@@ -754,9 +800,21 @@ body{
         </div>
       </div>
 
+ <!-- ═══ PICKS → KALSHI MARKETS ═══ -->
+      <div class="cd cd-hl mt8">
+        <div class="flex-b mb8">
+          <div>
+            <div class="fs9 ck fw7 ls1 mb6">PICKS → KALSHI</div>
+            <div class="fs8 cd3">Auto-match today's model picks to live NBA moneyline contracts</div>
+          </div>
+          <button class="btn btn-k" onclick="loadMyPickMarkets()">SCAN MARKETS</button>
+        </div>
+        <div id="my-pick-markets" class="fs9 cd3">Click <b>SCAN MARKETS</b> to find Kalshi tickers that match your picks.</div>
+      </div>
+
  <!-- Market Search -->
       <div class="cd mt8">
-        <div class="fs9 cd3 ls2 mb8">SEARCH KALSHI MARKETS</div>
+        <div class="fs9 ck fw7 ls1 mb6">SEARCH KALSHI MARKETS</div>
         <div class="flex gap8">
           <input type="text" id="mkt-search" class="inp inp-sm" style="flex:1" placeholder="Search player name, team, or ticker..." onkeydown="if(event.key==='Enter')searchKalshi()">
           <button class="btn btn-k" onclick="searchKalshi()">SEARCH</button>
@@ -819,7 +877,7 @@ body{
           </div>
 
           <!-- Order preview -->
-          <div id="trade-preview" class="mb8" style="background:var(--bg);border-radius:8px;padding:12px"></div>
+          <div id="trade-preview" class="mb8" style="background:rgba(0,245,196,0.04);border:1px solid rgba(0,245,196,0.15);border-radius:8px;padding:12px"></div>
 
           <!-- Place button -->
           <div id="trade-submit-btn" class="trade-confirm" onclick="submitTrade()">PLACE ORDER</div>
@@ -1562,6 +1620,102 @@ async function loadOrders() {
   } catch(e) { out.innerHTML = `<div class="fs9 cr">${e.message}</div>`; }
 }
 
+// ═══ PICKS → KALSHI MARKETS auto-match ═══
+async function loadMyPickMarkets() {
+  const c = el('my-pick-markets');
+  if (!D.games?.length) {
+    c.innerHTML = '<div class="fs9 cr">No model games loaded — load games on ANALYSIS tab first.</div>';
+    return;
+  }
+  c.innerHTML = '<div class="fs9 cd3 pulse">Scanning Kalshi NBA markets…</div>';
+  try {
+    const r = await fetch(BRIDGE + '/nba-markets').then(r => r.json());
+    if (r.error) throw new Error(r.error);
+    const ml = r.moneylines || {};
+    const rows = [];
+    let matched = 0;
+    D.games.forEach(g => {
+      const d = triModel(g.h, g.a, g);
+      const pickTeam = d.avg > 0.5 ? g.h : g.a;
+      const pickProb = d.avg > 0.5 ? d.avg : 1 - d.avg;
+      const key = `${g.a}_${g.h}_${pickTeam}`;
+      const m = ml[key];
+      if (!m) {
+        rows.push(`<div class="cd mb8" style="padding:12px"><div class="flex-b">
+          <div><span class="fs12 fw8">${pickTeam}</span> ${confTag(d.conf)} <span class="fs9 cd3">${g.a}@${g.h} · ${g.t||''}</span></div>
+          <div class="fs9 cd3">No live Kalshi market</div>
+        </div></div>`);
+        return;
+      }
+      matched++;
+      const ask = m.yes_ask;
+      // Snapshot Kalshi ask into the matching prediction record so the tracker
+      // can show "model said X, market was at Y" — closest thing to CLV we get
+      // until we add a tip-off-time poll.
+      if (ask != null) {
+        const predKey = `${D.date || new Date().toISOString().slice(0,10)}_${g.id}`;
+        const pred = predictions.find(p => p.key === predKey);
+        if (pred && pred.kalshiAskAtLog == null) {
+          pred.kalshiAskAtLog = ask;
+          pred.kalshiTicker = m.ticker;
+          pred.kalshiSnapAt = Date.now();
+          savePredictions();
+        }
+      }
+      if (ask == null) {
+        rows.push(`<div class="cd mb8" style="padding:12px">
+          <div class="flex-b">
+            <div><span class="fs12 fw8">${pickTeam}</span> ${confTag(d.conf)} <span class="fs9 cd3">${g.a}@${g.h}</span></div>
+            <div class="fs9 cd3">Market open · no asks</div>
+          </div>
+          <div class="fs8 cd4 mt6">${m.ticker}</div>
+        </div>`);
+        return;
+      }
+      const k = kelly(pickProb, ask/100, d.conf);
+      const contracts = ask > 0 ? Math.max(1, Math.floor((k.bet * 100) / ask)) : 0;
+      const edgeColor = k.edge > 0 ? 'cg' : 'cr';
+      rows.push(`<div class="cd mb8" style="padding:12px">
+        <div class="flex-b mb6">
+          <div>
+            <span class="fs13 fw8">${pickTeam}</span> ${confTag(d.conf)}
+            <span class="fs9 cd3">${g.a}@${g.h} · ${g.t||''}</span>
+          </div>
+          <div class="tr">
+            <div class="fs11 fw8 ck">YES @ ${ask}¢</div>
+            <div class="fs8 cd3">model ${(pickProb*100).toFixed(0)}% · <span class="${edgeColor}">edge ${k.edge.toFixed(1)}%</span></div>
+          </div>
+        </div>
+        <div class="flex-b">
+          <div class="fs9 cd2">Kelly $${k.bet.toFixed(2)} · ${contracts} contract${contracts===1?'':'s'}</div>
+          <button class="btn btn-k" style="padding:6px 14px;font-size:11px" onclick="prefillFromPick('${m.ticker}',${ask},${contracts})">PREP ORDER</button>
+        </div>
+        <div class="fs8 cd4 mt6" style="word-break:break-all">${m.ticker}</div>
+      </div>`);
+    });
+    const counts = r.counts || {};
+    const header = `<div class="fs8 cd3 mb8">Matched ${matched}/${D.games.length} picks · live market counts: game ${counts.KXNBAGAME||0}, spread ${counts.KXNBASPREAD||0}, total ${counts.KXNBATOTAL||0}, series ${counts.KXNBASERIES||0}</div>`;
+    c.innerHTML = header + (rows.length ? rows.join('') : '<div class="fs9 cd3">No picks to display.</div>');
+  } catch (e) {
+    c.innerHTML = `<div class="fs9 cr">Error: ${e.message}. Is bridge.py running on :5001?</div>`;
+  }
+}
+
+function prefillFromPick(ticker, price, count) {
+  if (!kalshiMarkets.find(m => m.ticker === ticker)) {
+    kalshiMarkets.push({ ticker, title: ticker, yes_ask: price });
+  }
+  const result = selectMarket(ticker);
+  Promise.resolve(result).then(() => {
+    el('trade-side').value = 'yes';
+    el('trade-price').value = price;
+    el('trade-count').value = count;
+    if (typeof updateTradePreview === 'function') updateTradePreview();
+    document.getElementById('trade-detail')?.scrollIntoView({behavior:'smooth', block:'start'});
+    if (typeof showToast === 'function') showToast(`Order pre-filled: YES ${count} @ ${price}¢`, 'info', 3000);
+  });
+}
+
 // ═══════════════════════════════════════════════════════
 // PROPS TAB — KALSHI LINE FETCHER
 // ═══════════════════════════════════════════════════════
@@ -1600,7 +1754,10 @@ async function fetchKalshiProps() {
 }
 
 // ═══════════════════════════════════════════════════════
-// MODEL A — EFFICIENCY (45%) — BACKTEST-PROVEN
+// MODEL A — EFFICIENCY (45%)
+// Note: in-sample fit only — backtest panel uses current
+// team stats for historical games (lookahead bias). Treat
+// tier accuracy as directional, not validated.
 // ═══════════════════════════════════════════════════════
 function modelA(h, a, g) {
   const hT = D.teams[h] || {}, aT = D.teams[a] || {};
@@ -1832,18 +1989,29 @@ function triModel(h, a, g) {
 
 function clamp(v) { return Math.max(0.05, Math.min(0.95, v)); }
 
+function tierRecord(conf) {
+  const settled = predictions.filter(p => p.conf === conf && (p.result === 'win' || p.result === 'loss'));
+  const w = settled.filter(p => p.result === 'win').length;
+  const l = settled.length - w;
+  return { w, l, n: settled.length };
+}
+
 function confTag(conf) {
-  const fireSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 80 80"><g fill="none"><path fill="#eb5757" fill-rule="evenodd" d="M40 67.965c11.046 0 20-8.954 20-20V46.76c0-4.42-1.38-8.728-3.95-12.325L40.04 12.02a.05.05 0 0 0-.08 0l-.145.205a9 9 0 0 0-.165 10.223l4.416 6.625A11.5 11.5 0 0 1 46 35.459v1.514c0 5.523-4.477 10-10 10s-10-4.477-10-10V35.46c0-2.273.673-4.495 1.934-6.386l2.15-3.224l-6.134 8.586A21.2 21.2 0 0 0 20 46.76v1.205c0 11.046 8.954 20 20 20" clip-rule="evenodd"/><path fill="#f2c94c" d="M51 36.973v-1.006l.982 1.375A16.2 16.2 0 0 1 55 46.76v1.205c0 8.284-6.716 15-15 15s-15-6.716-15-15v-.794a14.96 14.96 0 0 0 11 4.802c8.284 0 15-6.715 15-15"/></g></svg>';
   const m = {
-    LOCK: fireSvg + ' LOCK',
+    LOCK: '◇ STRONG',
     HIGH: '▲ HIGH',
-    MED: '◆ MED',
-    LOW: '▽ LOW'
+    MED:  '◆ MED',
+    LOW:  '▽ LOW'
   };
-  const c = {LOCK:'var(--k)', HIGH:'var(--g)', MED:'var(--y)', LOW:'var(--r)'};
+  const c  = {LOCK:'var(--k)',  HIGH:'var(--g)',  MED:'var(--y)',  LOW:'var(--r)'};
   const bg = {LOCK:'var(--kb)', HIGH:'var(--gb)', MED:'var(--yb)', LOW:'var(--rb)'};
-  const extraClass = conf === 'LOCK' ? ' conf-lock-shimmer' : '';
-  return `<span class="tg${extraClass}" style="background:${bg[conf]};color:${c[conf]};display:inline-flex;align-items:center;gap:3px">${m[conf]}</span>`;
+  const r = tierRecord(conf);
+  const recordSpan = r.n >= 5
+    ? ` <span style="opacity:0.75;font-weight:600">${r.w}-${r.l}</span>`
+    : r.n > 0
+      ? ` <span style="opacity:0.7;font-weight:600">${r.w}-${r.l}*</span>`
+      : ` <span style="opacity:0.65;font-weight:600">unproven</span>`;
+  return `<span class="tg" style="background:${bg[conf]};color:${c[conf]};display:inline-flex;align-items:center;gap:4px" title="${r.n >= 5 ? `Historical: ${r.w}-${r.l} (${((r.w/r.n)*100).toFixed(0)}%, n=${r.n})` : r.n > 0 ? `Only ${r.n} settled — too small to trust` : 'No settled predictions yet at this tier'}">${m[conf]}${recordSpan}</span>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2400,6 +2568,7 @@ function go(id) {
   document.querySelectorAll('.tab').forEach(t => { t.classList.remove('on','on-k'); });
   el('p-'+id).classList.add('on');
   document.querySelector(`[data-t="${id}"]`).classList.add(id==='kalshi'||id==='trade'?'on-k':'on');
+  try { localStorage.setItem('delta_tab', id); } catch(e) {}
 }
 function el(id) { return document.getElementById(id); }
 
@@ -2421,6 +2590,26 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   renderTracker();
   checkBridge();
+
+  // Restore last active tab (mobile users come back hours later)
+  try {
+    const lastTab = localStorage.getItem('delta_tab');
+    if (lastTab && el('p-' + lastTab)) go(lastTab);
+  } catch(e) {}
+
+  // Auto-fetch tonight's slate if we have nothing loaded — beats the
+  // "go to DATA tab or ask Claude to scrape" empty state.
+  setTimeout(async () => {
+    if (D.games?.length) return; // already loaded
+    try {
+      const status = await fetch(BRIDGE + '/status').then(r => r.json()).catch(() => null);
+      if (!status || !status.auth) return; // bridge offline, leave empty state alone
+      if (typeof autoFetch === 'function') {
+        if (typeof showToast === 'function') showToast('Auto-loading tonight\'s NBA slate…', 'info', 2500);
+        autoFetch();
+      }
+    } catch(e) {}
+  }, 800);
 });
 
 // Persist bankroll + kelly on change
@@ -2533,7 +2722,6 @@ document.addEventListener('mousemove', (e) => {
 function applyGlowClasses() {
   document.querySelectorAll('#kalshi-games .cd').forEach(card => {
     card.classList.add('cd-glow');
-    if (card.innerHTML.includes('LOCK')) card.classList.add('cd-lock');
   });
 }
 
@@ -2731,6 +2919,12 @@ async function runBacktest() {
   };
 
   let html = `
+    <div class="cd cd-r mb10" style="border-color:rgba(255,193,7,0.25);background:rgba(255,193,7,0.04)">
+      <div class="fs9 fw7" style="color:var(--y);letter-spacing:0.5px">⚠ IN-SAMPLE FIT — NOT A TRUE BACKTEST</div>
+      <div class="fs8 cd2 mt4" style="line-height:1.5">
+        Historical games are scored using <b>current</b> team stats (today's net rating, pace, etc.) — those numbers already encode the very results being predicted. Treat tier W/L below as <b>directional ranking</b>, not validated edge. A true backtest needs point-in-time team snapshots per game day.
+      </div>
+    </div>
     <div class="bt-grid">
       <div class="bt-stat">
         <div class="bt-stat-val" style="color:${parseFloat(totalAcc)>55?'var(--g)':parseFloat(totalAcc)<48?'var(--r)':'var(--y)'}">${totalAcc}%</div>
@@ -3035,9 +3229,14 @@ function renderTracker() {
         <span class="fs9 cd3" style="margin-left:8px">${p.date}</span>
         ${score}
       </div>
-      <div class="flex gap6" style="align-items:center">
+      <div class="flex gap6" style="align-items:center;flex-wrap:wrap">
         <span class="fs9 cd3">PICK: <span class="fw7" style="color:var(--p)">${p.pick}</span></span>
-        <span class="fs9 cd3">${p.modelPct}%</span>
+        <span class="fs9 cd3" title="Model probability for the pick">${p.modelPct}%</span>
+        ${p.kalshiAskAtLog != null ? (() => {
+          const edge = parseFloat(p.modelPct) - p.kalshiAskAtLog;
+          const col = edge > 2 ? 'var(--g)' : edge < -2 ? 'var(--r)' : 'var(--d2)';
+          return `<span class="fs9" style="color:${col};white-space:nowrap" title="Kalshi YES ask when SCAN MARKETS matched this pick — implied edge = model% − market%">K: ${p.kalshiAskAtLog}¢ <span style="opacity:0.7">(${edge>0?'+':''}${edge.toFixed(0)}pp)</span></span>`;
+        })() : ''}
         ${confTag(p.conf)}
         ${resultBadge}
         ${p.result === 'pending' ? `

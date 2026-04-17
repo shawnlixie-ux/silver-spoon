@@ -1089,6 +1089,90 @@ def get_injuries():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/nba-markets', methods=['GET'])
+def nba_markets():
+    """Pull live NBA markets across game/spread/total/series series_tickers and
+    normalize them so the Delta TRADE tab can join model picks to live tickers
+    by `AWAY_HOME_PICK` key."""
+    import re
+    import requests as req
+    from kalshi_python_sync.auth import KalshiAuth
+
+    SERIES_TO_FETCH = ['KXNBAGAME', 'KXNBASPREAD', 'KXNBATOTAL', 'KXNBASERIES']
+    auth = KalshiAuth(config.api_key_id, config.private_key_pem)
+
+    all_markets = {s: [] for s in SERIES_TO_FETCH}
+    try:
+        for series in SERIES_TO_FETCH:
+            cursor = None
+            for _ in range(3):  # up to 600 markets per series
+                params = {'series_ticker': series, 'status': 'open', 'limit': 200}
+                if cursor:
+                    params['cursor'] = cursor
+                h = auth.create_auth_headers('GET', '/trade-api/v2/markets')
+                h['Content-Type'] = 'application/json'
+                r = req.get('https://api.elections.kalshi.com/trade-api/v2/markets',
+                            headers=h, params=params, timeout=8)
+                d = r.json()
+                batch = d.get('markets', [])
+                all_markets[series].extend(batch)
+                cursor = d.get('cursor') if batch else None
+                if not cursor:
+                    break
+
+        # KXNBAGAME-26APR26BOSPHI-PHI  →  yy=26 mmm=APR dd=26 away=BOS home=PHI pick=PHI
+        moneylines = {}
+        game_re = re.compile(r'^KXNBAGAME-(\d{2}[A-Z]{3}\d{2})([A-Z]{3})([A-Z]{3})-([A-Z]{3})$')
+        for m in all_markets['KXNBAGAME']:
+            t = m.get('ticker', '')
+            mt = game_re.match(t)
+            if not mt:
+                continue
+            datestr, away, home, pick = mt.groups()
+            key = f"{away}_{home}_{pick}"
+            existing = moneylines.get(key)
+            if existing and (existing.get('close_time') or '') <= (m.get('close_time') or ''):
+                continue
+            moneylines[key] = {
+                'ticker': t,
+                'title': m.get('title', ''),
+                'date_token': datestr,
+                'away': away, 'home': home, 'pick': pick,
+                'yes_bid': m.get('yes_bid'), 'yes_ask': m.get('yes_ask'),
+                'no_bid': m.get('no_bid'), 'no_ask': m.get('no_ask'),
+                'volume': m.get('volume') or 0,
+                'open_interest': m.get('open_interest') or 0,
+                'close_time': m.get('close_time', ''),
+                'status': m.get('status', ''),
+            }
+
+        # KXNBASERIES-26PHIBOSR1-PHI  →  yy=26 away=PHI home=BOS round=1 pick=PHI
+        series_winners = {}
+        series_re = re.compile(r'^KXNBASERIES-(\d{2})([A-Z]{3})([A-Z]{3})R(\d)-([A-Z]{3})$')
+        for m in all_markets['KXNBASERIES']:
+            t = m.get('ticker', '')
+            mt = series_re.match(t)
+            if not mt:
+                continue
+            yy, away, home, rnd, pick = mt.groups()
+            series_winners[f"{away}_{home}_R{rnd}_{pick}"] = {
+                'ticker': t,
+                'title': m.get('title', ''),
+                'away': away, 'home': home, 'round': int(rnd), 'pick': pick,
+                'yes_bid': m.get('yes_bid'), 'yes_ask': m.get('yes_ask'),
+                'no_bid': m.get('no_bid'), 'no_ask': m.get('no_ask'),
+                'volume': m.get('volume') or 0,
+            }
+
+        return jsonify({
+            'moneylines': moneylines,
+            'series': series_winners,
+            'counts': {s: len(v) for s, v in all_markets.items()},
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("═══════════════════════════════════════════════")
     print("  PARLAY LAB — KALSHI BRIDGE SERVER")
